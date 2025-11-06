@@ -1,0 +1,10 @@
+# Configuration file example
+# Copy this file to config.yaml or set environment variables
+
+# Database connection string
+# Format: postgres://username:password@host:port/database?sslmode=disable
+database_url: "postgres://postgres:postgres@localhost/fpscore?sslmode=disable"
+
+# Server port
+port: "3000"
+

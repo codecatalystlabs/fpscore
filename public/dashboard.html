@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Family Planning Score Tool</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+</head>
+<body>
+    <div class="d-flex">
+        <div class="bg-light border-end" style="width: 260px; min-height: 100vh;">
+            <div class="p-3 border-bottom fw-bold">
+                <i class="bi bi-diagram-3"></i> Navigation
+            </div>
+            <div class="list-group list-group-flush" id="navigationItems">
+                <!-- Navigation items will be loaded dynamically based on permissions -->
+            </div>
+        </div>
+
+        <div class="flex-grow-1">
+            <div class="p-4">
+                <h3 class="mb-4"><i class="bi bi-speedometer2"></i> Dashboard</h3>
+
+                <!-- Filters -->
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <h5 class="card-title">Filters</h5>
+                        <div class="row g-3">
+                            <div class="col-md-3">
+                                <label class="form-label">Region</label>
+                                <select class="form-select" id="filterRegion">
+                                    <option value="">All Regions</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">District</label>
+                                <select class="form-select" id="filterDistrict" disabled>
+                                    <option value="">All Districts</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Assessment Type</label>
+                                <select class="form-select" id="filterAssessmentType">
+                                    <option value="">All Types</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Thematic Area</label>
+                                <select class="form-select" id="filterThematicArea" disabled>
+                                    <option value="">All Areas</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="mt-3">
+                            <button class="btn btn-primary" onclick="applyFilters()">Apply Filters</button>
+                            <button class="btn btn-secondary" onclick="clearFilters()">Clear</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <div class="card text-bg-primary">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h5 class="card-title mb-1">Assessments</h5>
+                                        <div id="metricAssessments" class="fs-4">0</div>
+                                    </div>
+                                    <i class="bi bi-clipboard2-check fs-1"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-bg-success">
+                            <div class="card-body">
+                                <h5 class="card-title mb-1">Average Score</h5>
+                                <div id="metricAvgScore" class="fs-4">0%</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-bg-warning">
+                            <div class="card-body">
+                                <h5 class="card-title mb-1">Competent</h5>
+                                <div id="metricCompetent" class="fs-4">0</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-bg-danger">
+                            <div class="card-body">
+                                <h5 class="card-title mb-1">Not Acceptable</h5>
+                                <div id="metricNA" class="fs-4">0</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mt-4">
+                    <div class="card-body">
+                        <h5 class="card-title">Recent Assessments</h5>
+                        <div id="recentAssessments"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="navigation.js"></script>
+    <script>
+        const API_BASE = '/api';
+        let filters = {};
+
+        // Check auth
+        if (!localStorage.getItem('token')) {
+            window.location.href = '/';
+        }
+
+        function getAuthHeaders() {
+            return {
+                'Authorization': 'Bearer ' + localStorage.getItem('token'),
+                'Content-Type': 'application/json'
+            };
+        }
+
+        function logout() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = '/';
+        }
+
+        async function loadFilters() {
+            try {
+                const [regions, types] = await Promise.all([
+                    fetch(`${API_BASE}/regions`, {headers: getAuthHeaders()}).then(r=>r.json()),
+                    fetch(`${API_BASE}/assessment-types`, {headers: getAuthHeaders()}).then(r=>r.json())
+                ]);
+                regions.forEach(r => {
+                    const opt = document.createElement('option');
+                    opt.value = r.id;
+                    opt.textContent = r.name;
+                    document.getElementById('filterRegion').appendChild(opt);
+                });
+                types.forEach(t => {
+                    const opt = document.createElement('option');
+                    opt.value = t.id;
+                    opt.textContent = t.name;
+                    document.getElementById('filterAssessmentType').appendChild(opt);
+                });
+            } catch (e) {
+                console.error('Error loading filters:', e);
+            }
+        }
+
+        document.getElementById('filterRegion').addEventListener('change', async function() {
+            const regionId = this.value;
+            const districtSelect = document.getElementById('filterDistrict');
+            if (regionId) {
+                try {
+                    const districts = await fetch(`${API_BASE}/districts/${regionId}`, {headers: getAuthHeaders()}).then(r=>r.json());
+                    districtSelect.innerHTML = '<option value="">All Districts</option>';
+                    districts.forEach(d => {
+                        const opt = document.createElement('option');
+                        opt.value = d.id;
+                        opt.textContent = d.name;
+                        districtSelect.appendChild(opt);
+                    });
+                    districtSelect.disabled = false;
+                } catch (e) {}
+            } else {
+                districtSelect.innerHTML = '<option value="">All Districts</option>';
+                districtSelect.disabled = true;
+            }
+        });
+
+        document.getElementById('filterAssessmentType').addEventListener('change', async function() {
+            const typeId = this.value;
+            const thematicSelect = document.getElementById('filterThematicArea');
+            if (typeId) {
+                try {
+                    const areas = await fetch(`${API_BASE}/assessment-types/${typeId}/thematic-areas`, {headers: getAuthHeaders()}).then(r=>r.json());
+                    thematicSelect.innerHTML = '<option value="">All Areas</option>';
+                    areas.forEach(a => {
+                        const opt = document.createElement('option');
+                        opt.value = a.id;
+                        opt.textContent = a.name;
+                        thematicSelect.appendChild(opt);
+                    });
+                    thematicSelect.disabled = false;
+                } catch (e) {}
+            } else {
+                thematicSelect.innerHTML = '<option value="">All Areas</option>';
+                thematicSelect.disabled = true;
+            }
+        });
+
+        function applyFilters() {
+            filters = {
+                regionId: document.getElementById('filterRegion').value,
+                districtId: document.getElementById('filterDistrict').value,
+                assessmentTypeId: document.getElementById('filterAssessmentType').value,
+                thematicAreaId: document.getElementById('filterThematicArea').value
+            };
+            loadDashboard();
+        }
+
+        function clearFilters() {
+            document.getElementById('filterRegion').value = '';
+            document.getElementById('filterDistrict').value = '';
+            document.getElementById('filterDistrict').disabled = true;
+            document.getElementById('filterAssessmentType').value = '';
+            document.getElementById('filterThematicArea').value = '';
+            document.getElementById('filterThematicArea').disabled = true;
+            filters = {};
+            loadDashboard();
+        }
+
+        async function loadDashboard() {
+            try {
+                let url = `${API_BASE}/assessments`;
+                const params = new URLSearchParams();
+                if (filters.regionId) params.append('regionId', filters.regionId);
+                if (filters.districtId) params.append('districtId', filters.districtId);
+                if (filters.assessmentTypeId) params.append('assessmentTypeId', filters.assessmentTypeId);
+                if (filters.thematicAreaId) params.append('thematicAreaId', filters.thematicAreaId);
+                if (params.toString()) url += '?' + params.toString();
+
+                const resp = await fetch(url, {headers: getAuthHeaders()});
+                if (!resp.ok) throw new Error('Failed to load');
+                const data = await resp.json();
+                
+                document.getElementById('metricAssessments').textContent = data.length;
+                if (data.length) {
+                    const avg = data.reduce((s,a)=>s + a.percentage, 0) / data.length;
+                    document.getElementById('metricAvgScore').textContent = avg.toFixed(1) + '%';
+                    document.getElementById('metricCompetent').textContent = data.filter(a=>a.performanceLevel==='Competent').length;
+                    document.getElementById('metricNA').textContent = data.filter(a=>a.performanceLevel==='Not Acceptable').length;
+                }
+                const recent = data.slice(0,10).map(a=>`<div class="d-flex justify-content-between border-bottom py-2"><div>${new Date(a.createdAt).toLocaleString()} - ${a.facilityName}</div><div><strong>${a.percentage.toFixed(1)}%</strong> <span class="badge ${a.performanceLevel==='Proficient'?'bg-success':a.performanceLevel==='Competent'?'bg-warning':'bg-danger'}">${a.performanceLevel}</span></div></div>`).join('');
+                document.getElementById('recentAssessments').innerHTML = recent || '<p class="text-muted">No data</p>';
+            } catch (e) {
+                console.error('Error loading dashboard:', e);
+            }
+        }
+
+        loadFilters();
+        loadDashboard();
+    </script>
+</body>
+</html>
