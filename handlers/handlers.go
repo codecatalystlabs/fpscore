@@ -483,6 +483,11 @@ func GetAssessments(c *fiber.Ctx) error {
 		args = append(args, districtID)
 		argIdx++
 	}
+	if facilityID := c.Query("facilityId"); facilityID != "" {
+		query += fmt.Sprintf(" AND f.id = $%d", argIdx)
+		args = append(args, facilityID)
+		argIdx++
+	}
 	if assessmentTypeID := c.Query("assessmentTypeId"); assessmentTypeID != "" {
 		query += fmt.Sprintf(" AND a.assessment_type_id = $%d", argIdx)
 		args = append(args, assessmentTypeID)

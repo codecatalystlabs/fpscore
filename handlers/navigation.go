@@ -87,7 +87,7 @@ func GetNavigationItems(c *fiber.Ctx) error {
 	if hasPermission("facilities.view") || hasPermission("admin.areas.view") {
 		items = append(items, NavigationItem{
 			Label: "Facilities",
-			URL:   "#",
+			URL:   "facilities.html",
 			Icon:  "bi-hospital",
 		})
 	}

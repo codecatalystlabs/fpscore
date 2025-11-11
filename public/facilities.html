@@ -1,0 +1,1226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Facilities - Family Planning Score Tool</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+</head>
+<body>
+    <div class="d-flex">
+        <div class="bg-light border-end" style="width: 260px; min-height: 100vh;">
+            <div class="p-3 border-bottom fw-bold">
+                <i class="bi bi-diagram-3"></i> Navigation
+            </div>
+            <div class="list-group list-group-flush" id="navigationItems">
+                <!-- Navigation items loaded dynamically -->
+            </div>
+        </div>
+
+        <div class="flex-grow-1">
+            <div class="p-4">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <div>
+                        <h3 class="mb-0"><i class="bi bi-hospital"></i> Facilities</h3>
+                        <p class="text-muted small mb-0">Manage facilities and their administrative assignments.</p>
+                    </div>
+                    <button class="btn btn-primary" id="addFacilityBtn"><i class="bi bi-plus"></i> New Facility</button>
+                </div>
+
+                <ul class="nav nav-tabs" id="facilityTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="facilities-tab" data-bs-toggle="tab" data-bs-target="#facilitiesTab" type="button" role="tab" aria-controls="facilitiesTab" aria-selected="true">
+                            Facilities
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="hierarchy-tab" data-bs-toggle="tab" data-bs-target="#hierarchyTab" type="button" role="tab" aria-controls="hierarchyTab" aria-selected="false">
+                            Hierarchy Operations
+                        </button>
+                    </li>
+                </ul>
+
+                <div class="tab-content mt-3" id="facilityTabsContent">
+                    <div class="tab-pane fade show active" id="facilitiesTab" role="tabpanel" aria-labelledby="facilities-tab">
+                        <div class="card mb-4">
+                            <div class="card-header bg-white">
+                                <strong>Filters</strong>
+                            </div>
+                            <div class="card-body">
+                                <div class="row g-3">
+                                    <div class="col-md-3">
+                                        <label class="form-label">Region</label>
+                                        <select class="form-select" id="filterRegion">
+                                            <option value="">All Regions</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">District</label>
+                                        <select class="form-select" id="filterDistrict" disabled>
+                                            <option value="">All Districts</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Subcounty</label>
+                                        <select class="form-select" id="filterSubcounty" disabled>
+                                            <option value="">All Subcounties</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Search</label>
+                                        <div class="input-group">
+                                            <input type="text" id="filterSearch" class="form-control" placeholder="Facility name">
+                                            <button class="btn btn-outline-secondary" id="filterClearBtn" title="Clear filters"><i class="bi bi-x"></i></button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h5 class="card-title mb-0">Facilities List</h5>
+                                    <div class="text-muted" id="facilitiesCount"></div>
+                                </div>
+                                <div id="facilitiesTableWrapper">
+                                    <div class="text-center py-5">
+                                        <div class="spinner-border text-primary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card mt-4">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h5 class="card-title mb-0">Facility Assessments</h5>
+                                        <small class="text-muted" id="selectedFacilityTitle">Select a facility to view its assessments.</small>
+                                    </div>
+                                    <button class="btn btn-outline-secondary btn-sm d-none" id="clearSelectedFacilityBtn">
+                                        <i class="bi bi-x-circle"></i> Clear Selection
+                                    </button>
+                                </div>
+                                <div id="facilityAssessmentsWrapper" class="mt-3">
+                                    <p class="text-muted">No facility selected.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="tab-pane fade" id="hierarchyTab" role="tabpanel" aria-labelledby="hierarchy-tab">
+                        <div class="card">
+                            <div class="card-body">
+                                <h5 class="card-title">Hierarchy Operations</h5>
+                                <p class="text-muted small">Move administrative units to new parents. Changes are applied immediately.</p>
+                                <div id="hierarchyMessage"></div>
+
+                                <section class="mb-5">
+                                    <h6 class="fw-bold">Move Districts to a New Region</h6>
+                                    <p class="text-muted small">Select one or more districts and choose the destination region.</p>
+                                    <div class="row g-3 align-items-end">
+                                        <div class="col-md-4">
+                                            <label class="form-label">Current Region</label>
+                                            <select class="form-select" id="hierarchyRegionDistrict">
+                                                <option value="">Select Region</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-5">
+                                            <label class="form-label">Districts</label>
+                                            <select class="form-select" id="hierarchyDistricts" multiple size="8" disabled>
+                                                <option value="">Select a region first</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="form-label">New Region</label>
+                                            <select class="form-select" id="hierarchyNewRegionDistrict">
+                                                <option value="">Select Region</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="mt-3">
+                                        <button class="btn btn-primary" id="moveDistrictsBtn">Move Districts</button>
+                                    </div>
+                                </section>
+
+                                <hr class="my-4">
+
+                                <section class="mb-5">
+                                    <h6 class="fw-bold">Move Subcounties to a New District</h6>
+                                    <p class="text-muted small">Select subcounties and the target district.</p>
+                                    <div class="row g-3 align-items-end">
+                                        <div class="col-md-3">
+                                            <label class="form-label">Current Region</label>
+                                            <select class="form-select" id="hierarchyRegionSubcounty">
+                                                <option value="">Select Region</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="form-label">Current District</label>
+                                            <select class="form-select" id="hierarchyDistrictSubcounty" disabled>
+                                                <option value="">Select District</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="form-label">Subcounties</label>
+                                            <select class="form-select" id="hierarchySubcounties" multiple size="8" disabled>
+                                                <option value="">Select a district first</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="form-label">New Region</label>
+                                            <select class="form-select" id="hierarchyNewRegionSubcounty">
+                                                <option value="">Select Region</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-3 mt-3">
+                                            <label class="form-label">New District</label>
+                                            <select class="form-select" id="hierarchyNewDistrictSubcounty" disabled>
+                                                <option value="">Select District</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="mt-3">
+                                        <button class="btn btn-primary" id="moveSubcountiesBtn">Move Subcounties</button>
+                                    </div>
+                                </section>
+
+                                <hr class="my-4">
+
+                                <section>
+                                    <h6 class="fw-bold">Move Facilities to a New Subcounty</h6>
+                                    <p class="text-muted small">Select facilities and the target subcounty.</p>
+                                    <div class="row g-3 align-items-end">
+                                        <div class="col-md-3">
+                                            <label class="form-label">Current Region</label>
+                                            <select class="form-select" id="hierarchyRegionFacility">
+                                                <option value="">Select Region</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="form-label">Current District</label>
+                                            <select class="form-select" id="hierarchyDistrictFacility" disabled>
+                                                <option value="">Select District</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="form-label">Current Subcounty</label>
+                                            <select class="form-select" id="hierarchySubcountyFacility" disabled>
+                                                <option value="">Select Subcounty</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="form-label">Facilities</label>
+                                            <select class="form-select" id="hierarchyFacilities" multiple size="8" disabled>
+                                                <option value="">Select a subcounty first</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-3 mt-3">
+                                            <label class="form-label">New Region</label>
+                                            <select class="form-select" id="hierarchyNewRegionFacility">
+                                                <option value="">Select Region</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-3 mt-3">
+                                            <label class="form-label">New District</label>
+                                            <select class="form-select" id="hierarchyNewDistrictFacility" disabled>
+                                                <option value="">Select District</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-3 mt-3">
+                                            <label class="form-label">New Subcounty</label>
+                                            <select class="form-select" id="hierarchyNewSubcountyFacility" disabled>
+                                                <option value="">Select Subcounty</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="mt-3">
+                                        <button class="btn btn-primary" id="moveFacilitiesBtn">Move Facilities</button>
+                                    </div>
+                                </section>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Facility Modal -->
+    <div class="modal fade" id="facilityModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="facilityModalTitle">New Facility</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="facilityForm">
+                        <input type="hidden" id="facilityId">
+                        <div class="mb-3">
+                            <label class="form-label">Region</label>
+                            <select class="form-select" id="formRegion" required>
+                                <option value="">Select Region</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">District</label>
+                            <select class="form-select" id="formDistrict" required disabled>
+                                <option value="">Select District</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Subcounty</label>
+                            <select class="form-select" id="formSubcounty" required disabled>
+                                <option value="">Select Subcounty</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Facility Name</label>
+                            <input type="text" class="form-control" id="formName" required placeholder="Enter facility name">
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="saveFacilityBtn">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="navigation.js"></script>
+    <script>
+        const API_BASE = '/api';
+        let canManageFacilities = false;
+        let facilityModal;
+        let facilitiesCache = [];
+        let selectedFacility = null;
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            if (!localStorage.getItem('token')) {
+                window.location.href = '/';
+                return;
+            }
+
+            facilityModal = new bootstrap.Modal(document.getElementById('facilityModal'));
+
+            await loadPermissions();
+            await loadFilterRegions();
+            await loadFormRegions();
+            await loadFacilities();
+
+            setupFilterHandlers();
+            setupFormHandlers();
+            await loadHierarchyRegions();
+            setupHierarchyHandlers();
+
+            const clearSelectedBtn = document.getElementById('clearSelectedFacilityBtn');
+            if (clearSelectedBtn) {
+                clearSelectedBtn.addEventListener('click', () => {
+                    selectedFacility = null;
+                    updateSelectedFacilityUI();
+                    const assessmentsWrapper = document.getElementById('facilityAssessmentsWrapper');
+                    if (assessmentsWrapper) {
+                        assessmentsWrapper.innerHTML = '<p class="text-muted">No facility selected.</p>';
+                    }
+                });
+            }
+        });
+
+        function getAuthHeaders(contentType = 'application/json') {
+            const headers = {};
+            const token = localStorage.getItem('token');
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+            if (contentType) {
+                headers['Content-Type'] = contentType;
+            }
+            return headers;
+        }
+
+        async function loadPermissions() {
+            try {
+                const response = await fetch(`${API_BASE}/users/me/permissions`, { headers: getAuthHeaders(null) });
+                if (!response.ok) throw new Error('Failed to load permissions');
+                const permissions = await response.json();
+                canManageFacilities = permissions.some(p => p.code === 'facilities.manage');
+
+                const addBtn = document.getElementById('addFacilityBtn');
+                if (!canManageFacilities && addBtn) {
+                    addBtn.classList.add('d-none');
+                }
+                if (addBtn) {
+                    addBtn.addEventListener('click', openCreateModal);
+                }
+            } catch (error) {
+                console.error('Error loading permissions:', error);
+                canManageFacilities = false;
+            }
+        }
+
+        function selectFacility(facility) {
+            if (!facility) return;
+            selectedFacility = facility;
+            updateSelectedFacilityUI();
+            loadFacilityAssessments(facility.id, facility.name);
+        }
+
+        function updateSelectedFacilityUI() {
+            const title = document.getElementById('selectedFacilityTitle');
+            const clearBtn = document.getElementById('clearSelectedFacilityBtn');
+            const rows = document.querySelectorAll('#facilitiesTableWrapper tbody tr');
+
+            rows.forEach(row => {
+                if (!selectedFacility) {
+                    row.classList.remove('table-active');
+                    return;
+                }
+                const rowId = parseInt(row.dataset.id, 10);
+                row.classList.toggle('table-active', rowId === selectedFacility.id);
+            });
+
+            if (selectedFacility) {
+                if (title) title.textContent = `${selectedFacility.name} - Assessments`;
+                if (clearBtn) clearBtn.classList.remove('d-none');
+            } else {
+                if (title) title.textContent = 'Select a facility to view its assessments.';
+                if (clearBtn) clearBtn.classList.add('d-none');
+            }
+        }
+
+        async function loadFacilityAssessments(facilityId, facilityName) {
+            const wrapper = document.getElementById('facilityAssessmentsWrapper');
+            if (!wrapper) return;
+
+            wrapper.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div></div>';
+
+            try {
+                const params = new URLSearchParams({ facilityId });
+                const response = await fetch(`${API_BASE}/assessments?${params.toString()}`, { headers: getAuthHeaders(null) });
+                if (!response.ok) {
+                    if (response.status === 403) {
+                        wrapper.innerHTML = '<div class="alert alert-warning">You do not have permission to view assessments for this facility.</div>';
+                        return;
+                    }
+                    throw new Error(`Failed to load assessments (${response.status})`);
+                }
+
+                const assessments = await response.json();
+                if (!Array.isArray(assessments) || assessments.length === 0) {
+                    wrapper.innerHTML = `<p class="text-muted">No assessments found for ${facilityName}.</p>`;
+                    return;
+                }
+
+                const rows = assessments.map(a => {
+                    const percentage = a.percentage !== undefined
+                        ? parseFloat(a.percentage).toFixed(1)
+                        : (a.percentageScore !== undefined ? parseFloat(a.percentageScore).toFixed(1) : '0.0');
+                    const createdAt = a.createdAt || a.created_at || '';
+                    const dateDisplay = createdAt ? new Date(createdAt).toLocaleString() : 'N/A';
+                    const level = a.performanceLevel || a.performance_level || 'N/A';
+                    const badgeClass = level === 'Proficient' ? 'bg-success' : level === 'Competent' ? 'bg-warning' : 'bg-danger';
+
+                    return `
+                        <tr>
+                            <td>${dateDisplay}</td>
+                            <td>${a.assessmentType || a.assessment_type || 'N/A'}</td>
+                            <td><strong>${percentage}%</strong></td>
+                            <td><span class="badge ${badgeClass}">${level}</span></td>
+                        </tr>
+                    `;
+                }).join('');
+
+                wrapper.innerHTML = `
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover align-middle">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Assessment Type</th>
+                                    <th>Score</th>
+                                    <th>Level</th>
+                                </tr>
+                            </thead>
+                            <tbody>${rows}</tbody>
+                        </table>
+                    </div>`;
+            } catch (error) {
+                console.error('Failed to load facility assessments:', error);
+                wrapper.innerHTML = `<div class="alert alert-danger">Error loading assessments: ${error.message}</div>`;
+            }
+        }
+
+        async function loadFilterRegions() {
+            const regionSelect = document.getElementById('filterRegion');
+            if (!regionSelect) return;
+            try {
+                const response = await fetch(`${API_BASE}/regions`, { headers: getAuthHeaders(null) });
+                if (!response.ok) throw new Error('Failed to load regions');
+                const regions = await response.json();
+                regionSelect.innerHTML = '<option value="">All Regions</option>';
+                regions.forEach(region => {
+                    const opt = document.createElement('option');
+                    opt.value = region.id;
+                    opt.textContent = region.name;
+                    regionSelect.appendChild(opt);
+                });
+            } catch (error) {
+                console.error('Error loading regions:', error);
+                regionSelect.innerHTML = '<option value="">Failed to load regions</option>';
+            }
+        }
+
+        async function loadFormRegions() {
+            const regionSelect = document.getElementById('formRegion');
+            if (!regionSelect) return;
+            try {
+                const response = await fetch(`${API_BASE}/regions`, { headers: getAuthHeaders(null) });
+                if (!response.ok) throw new Error('Failed to load regions');
+                const regions = await response.json();
+                regionSelect.innerHTML = '<option value="">Select Region</option>';
+                regions.forEach(region => {
+                    const opt = document.createElement('option');
+                    opt.value = region.id;
+                    opt.textContent = region.name;
+                    regionSelect.appendChild(opt);
+                });
+            } catch (error) {
+                console.error('Error loading regions:', error);
+                regionSelect.innerHTML = '<option value="">Failed to load regions</option>';
+            }
+        }
+
+        function setupFilterHandlers() {
+            const regionSelect = document.getElementById('filterRegion');
+            const districtSelect = document.getElementById('filterDistrict');
+            const subcountySelect = document.getElementById('filterSubcounty');
+            const searchInput = document.getElementById('filterSearch');
+            const clearBtn = document.getElementById('filterClearBtn');
+
+            if (regionSelect) {
+                regionSelect.addEventListener('change', async function () {
+                    const regionId = this.value;
+                    resetSelect(districtSelect, 'All Districts', true);
+                    resetSelect(subcountySelect, 'All Subcounties', true);
+                    if (regionId) {
+                        await populateDistricts(regionId, districtSelect, 'All Districts');
+                        districtSelect.disabled = false;
+                    }
+                    await loadFacilities();
+                });
+            }
+
+            if (districtSelect) {
+                districtSelect.addEventListener('change', async function () {
+                    const districtId = this.value;
+                    resetSelect(subcountySelect, 'All Subcounties', true);
+                    if (districtId) {
+                        await populateSubcounties(districtId, subcountySelect, 'All Subcounties');
+                        subcountySelect.disabled = false;
+                    }
+                    await loadFacilities();
+                });
+            }
+
+            if (subcountySelect) {
+                subcountySelect.addEventListener('change', loadFacilities);
+            }
+
+            if (searchInput) {
+                let searchTimeout;
+                searchInput.addEventListener('input', () => {
+                    clearTimeout(searchTimeout);
+                    searchTimeout = setTimeout(loadFacilities, 400);
+                });
+            }
+
+            if (clearBtn) {
+                clearBtn.addEventListener('click', () => {
+                    if (regionSelect) regionSelect.value = '';
+                    resetSelect(districtSelect, 'All Districts', true);
+                    resetSelect(subcountySelect, 'All Subcounties', true);
+                    if (searchInput) searchInput.value = '';
+                    loadFacilities();
+                });
+            }
+        }
+
+        function setupFormHandlers() {
+            const regionSelect = document.getElementById('formRegion');
+            const districtSelect = document.getElementById('formDistrict');
+            const subcountySelect = document.getElementById('formSubcounty');
+            const saveBtn = document.getElementById('saveFacilityBtn');
+
+            if (regionSelect) {
+                regionSelect.addEventListener('change', async function () {
+                    const regionId = this.value;
+                    resetSelect(districtSelect, 'Select District', true);
+                    resetSelect(subcountySelect, 'Select Subcounty', true);
+                    if (regionId) {
+                        await populateDistricts(regionId, districtSelect, 'Select District');
+                        districtSelect.disabled = false;
+                    }
+                });
+            }
+
+            if (districtSelect) {
+                districtSelect.addEventListener('change', async function () {
+                    const districtId = this.value;
+                    resetSelect(subcountySelect, 'Select Subcounty', true);
+                    if (districtId) {
+                        await populateSubcounties(districtId, subcountySelect, 'Select Subcounty');
+                        subcountySelect.disabled = false;
+                    }
+                });
+            }
+
+            if (saveBtn) {
+                saveBtn.addEventListener('click', saveFacility);
+            }
+        }
+
+        async function populateDistricts(regionId, selectEl, defaultLabel) {
+            if (!selectEl) return;
+            try {
+                const response = await fetch(`${API_BASE}/districts/${regionId}`, { headers: getAuthHeaders(null) });
+                if (!response.ok) throw new Error('Failed to load districts');
+                const districts = await response.json();
+                selectEl.innerHTML = `<option value="">${defaultLabel}</option>`;
+                districts.forEach(d => {
+                    const opt = document.createElement('option');
+                    opt.value = d.id;
+                    opt.textContent = d.name;
+                    selectEl.appendChild(opt);
+                });
+            } catch (error) {
+                console.error('Error loading districts:', error);
+                selectEl.innerHTML = `<option value="">Failed to load districts</option>`;
+            }
+        }
+
+        async function populateSubcounties(districtId, selectEl, defaultLabel) {
+            if (!selectEl) return;
+            try {
+                const response = await fetch(`${API_BASE}/subcounties/${districtId}`, { headers: getAuthHeaders(null) });
+                if (!response.ok) throw new Error('Failed to load subcounties');
+                const subcounties = await response.json();
+                selectEl.innerHTML = `<option value="">${defaultLabel}</option>`;
+                subcounties.forEach(s => {
+                    const opt = document.createElement('option');
+                    opt.value = s.id;
+                    opt.textContent = s.name;
+                    selectEl.appendChild(opt);
+                });
+            } catch (error) {
+                console.error('Error loading subcounties:', error);
+                selectEl.innerHTML = `<option value="">Failed to load subcounties</option>`;
+            }
+        }
+
+        function resetSelect(selectEl, defaultLabel, disable) {
+            if (!selectEl) return;
+            selectEl.innerHTML = `<option value="">${defaultLabel}</option>`;
+            selectEl.disabled = disable;
+        }
+
+        function resetMultiSelect(selectEl, placeholder) {
+            if (!selectEl) return;
+            selectEl.innerHTML = placeholder ? `<option value="" disabled>${placeholder}</option>` : '';
+            selectEl.disabled = true;
+        }
+
+        async function loadFacilities() {
+            const wrapper = document.getElementById('facilitiesTableWrapper');
+            const countEl = document.getElementById('facilitiesCount');
+            if (!wrapper) return;
+
+            wrapper.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div></div>';
+            if (countEl) countEl.textContent = '';
+
+            const params = new URLSearchParams();
+            const regionId = document.getElementById('filterRegion')?.value;
+            const districtId = document.getElementById('filterDistrict')?.value;
+            const subcountyId = document.getElementById('filterSubcounty')?.value;
+            const search = document.getElementById('filterSearch')?.value.trim();
+
+            if (regionId) params.append('regionId', regionId);
+            if (districtId) params.append('districtId', districtId);
+            if (subcountyId) params.append('subcountyId', subcountyId);
+            if (search) params.append('search', search);
+
+            const url = params.toString() ? `${API_BASE}/facilities?${params.toString()}` : `${API_BASE}/facilities`;
+
+            try {
+                const response = await fetch(url, { headers: getAuthHeaders(null) });
+                if (!response.ok) {
+                    if (response.status === 403) {
+                        wrapper.innerHTML = '<div class="alert alert-warning">You do not have permission to view facilities.</div>';
+                        return;
+                    }
+                    throw new Error(`Failed to load facilities (${response.status})`);
+                }
+
+                const facilities = await response.json();
+                facilitiesCache = Array.isArray(facilities) ? facilities : [];
+                if (selectedFacility) {
+                    const match = facilitiesCache.find(f => f.id === selectedFacility.id);
+                    if (match) {
+                        selectedFacility = match;
+                    } else {
+                        selectedFacility = null;
+                    }
+                }
+                if (Array.isArray(facilities) && facilities.length > 0) {
+                    wrapper.innerHTML = `
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Region</th>
+                                        <th>District</th>
+                                        <th>Subcounty</th>
+                                        <th>Created</th>
+                                        ${canManageFacilities ? '<th style="width: 130px">Actions</th>' : ''}
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>`;
+                    const tbody = wrapper.querySelector('tbody');
+                    facilities.forEach(fac => {
+                        const tr = document.createElement('tr');
+                        tr.dataset.id = fac.id;
+                        tr.innerHTML = `
+                            <td>${fac.name}</td>
+                            <td>${fac.regionName || ''}</td>
+                            <td>${fac.districtName || ''}</td>
+                            <td>${fac.subcountyName || ''}</td>
+                            <td>${fac.createdAt ? new Date(fac.createdAt).toLocaleString() : ''}</td>
+                            ${canManageFacilities ? `
+                                <td>
+                                    <button class="btn btn-sm btn-outline-primary me-2" data-action="edit" data-id="${fac.id}"><i class="bi bi-pencil"></i></button>
+                                    <button class="btn btn-sm btn-outline-danger" data-action="delete" data-id="${fac.id}"><i class="bi bi-trash"></i></button>
+                                </td>` : ''}
+                        `;
+                        tr.addEventListener('click', (event) => {
+                            if (event.target.closest('button')) return;
+                            selectFacility(fac);
+                        });
+                        tbody.appendChild(tr);
+                    });
+
+                    if (canManageFacilities) {
+                        tbody.querySelectorAll('button[data-action="edit"]').forEach(btn => btn.addEventListener('click', (ev) => {
+                            ev.stopPropagation();
+                            openEditModal(btn.dataset.id, facilitiesCache);
+                        }));
+                        tbody.querySelectorAll('button[data-action="delete"]').forEach(btn => btn.addEventListener('click', (ev) => {
+                            ev.stopPropagation();
+                            deleteFacility(btn.dataset.id);
+                        }));
+                    }
+
+                    if (countEl) {
+                        countEl.textContent = `${facilities.length} facility${facilities.length === 1 ? '' : 'ies'}`;
+                    }
+                    updateSelectedFacilityUI();
+                } else {
+                    wrapper.innerHTML = '<p class="text-center text-muted py-4">No facilities found.</p>';
+                    if (countEl) countEl.textContent = '0 facilities';
+                    selectedFacility = null;
+                    updateSelectedFacilityUI();
+                    const assessmentsWrapper = document.getElementById('facilityAssessmentsWrapper');
+                    if (assessmentsWrapper) {
+                        assessmentsWrapper.innerHTML = '<p class="text-muted">No facility selected.</p>';
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to load facilities:', error);
+                wrapper.innerHTML = `<div class="alert alert-danger">Error loading facilities: ${error.message}</div>`;
+            }
+        }
+
+        function openCreateModal() {
+            if (!canManageFacilities) return;
+            document.getElementById('facilityModalTitle').textContent = 'New Facility';
+            document.getElementById('facilityForm').reset();
+            document.getElementById('facilityId').value = '';
+            resetSelect(document.getElementById('formDistrict'), 'Select District', true);
+            resetSelect(document.getElementById('formSubcounty'), 'Select Subcounty', true);
+            facilityModal.show();
+        }
+
+        function openEditModal(id, facilities) {
+            if (!canManageFacilities) return;
+            const facility = facilities.find(f => f.id == id);
+            if (!facility) return;
+            document.getElementById('facilityModalTitle').textContent = 'Edit Facility';
+            document.getElementById('facilityId').value = facility.id;
+            document.getElementById('formName').value = facility.name;
+
+            document.getElementById('formRegion').value = facility.regionId;
+            populateDistricts(facility.regionId, document.getElementById('formDistrict'), 'Select District').then(() => {
+                const districtSelect = document.getElementById('formDistrict');
+                districtSelect.disabled = false;
+                districtSelect.value = facility.districtId;
+                populateSubcounties(facility.districtId, document.getElementById('formSubcounty'), 'Select Subcounty').then(() => {
+                    const subcountySelect = document.getElementById('formSubcounty');
+                    subcountySelect.disabled = false;
+                    subcountySelect.value = facility.subcountyId;
+                });
+            });
+
+            facilityModal.show();
+        }
+
+        async function saveFacility() {
+            if (!canManageFacilities) return;
+            const form = document.getElementById('facilityForm');
+            if (!form.reportValidity()) return;
+
+            const payload = {
+                name: document.getElementById('formName').value.trim(),
+                subcountyId: parseInt(document.getElementById('formSubcounty').value, 10)
+            };
+
+            const facilityId = document.getElementById('facilityId').value;
+            const isEdit = Boolean(facilityId);
+
+            try {
+                const response = await fetch(isEdit ? `${API_BASE}/facilities/${facilityId}` : `${API_BASE}/facilities`, {
+                    method: isEdit ? 'PUT' : 'POST',
+                    headers: getAuthHeaders('application/json'),
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    const error = await response.json().catch(() => ({ error: 'Failed to save facility' }));
+                    throw new Error(error.error || 'Failed to save facility');
+                }
+
+                facilityModal.hide();
+                loadFacilities();
+            } catch (error) {
+                console.error('Error saving facility:', error);
+                alert(error.message || 'Failed to save facility');
+            }
+        }
+
+        async function deleteFacility(id) {
+            if (!canManageFacilities) return;
+            if (!confirm('Delete this facility? This action cannot be undone.')) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/facilities/${id}`, {
+                    method: 'DELETE',
+                    headers: getAuthHeaders(null)
+                });
+
+                if (!response.ok) {
+                    const error = await response.json().catch(() => ({ error: 'Failed to delete facility' }));
+                    throw new Error(error.error || 'Failed to delete facility');
+                }
+
+                if (selectedFacility && selectedFacility.id == id) {
+                    selectedFacility = null;
+                    updateSelectedFacilityUI();
+                    const assessmentsWrapper = document.getElementById('facilityAssessmentsWrapper');
+                    if (assessmentsWrapper) {
+                        assessmentsWrapper.innerHTML = '<p class="text-muted">No facility selected.</p>';
+                    }
+                }
+
+                loadFacilities();
+            } catch (error) {
+                console.error('Error deleting facility:', error);
+                alert(error.message || 'Failed to delete facility');
+            }
+        }
+
+        async function loadHierarchyRegions() {
+            const regionSelects = [
+                { element: document.getElementById('hierarchyRegionDistrict'), label: 'Select Region' },
+                { element: document.getElementById('hierarchyRegionSubcounty'), label: 'Select Region' },
+                { element: document.getElementById('hierarchyRegionFacility'), label: 'Select Region' },
+                { element: document.getElementById('hierarchyNewRegionDistrict'), label: 'Select Region' },
+                { element: document.getElementById('hierarchyNewRegionSubcounty'), label: 'Select Region' },
+                { element: document.getElementById('hierarchyNewRegionFacility'), label: 'Select Region' },
+            ];
+
+            try {
+                const response = await fetch(`${API_BASE}/regions`, { headers: getAuthHeaders(null) });
+                if (!response.ok) throw new Error('Failed to load regions');
+                const regions = await response.json();
+
+                regionSelects.forEach(({ element, label }) => {
+                    if (!element) return;
+                    element.innerHTML = `<option value="">${label}</option>`;
+                    regions.forEach(region => {
+                        const opt = document.createElement('option');
+                        opt.value = region.id;
+                        opt.textContent = region.name;
+                        element.appendChild(opt);
+                    });
+                });
+            } catch (error) {
+                console.error('Error loading hierarchy regions:', error);
+                regionSelects.forEach(({ element, label }) => {
+                    if (!element) return;
+                    element.innerHTML = `<option value="">${label} (unavailable)</option>`;
+                });
+            }
+
+            resetMultiSelect(document.getElementById('hierarchyDistricts'), 'Select a region first');
+            resetSelect(document.getElementById('hierarchyDistrictSubcounty'), 'Select District', true);
+            resetMultiSelect(document.getElementById('hierarchySubcounties'), 'Select a district first');
+            resetSelect(document.getElementById('hierarchyNewDistrictSubcounty'), 'Select District', true);
+            resetSelect(document.getElementById('hierarchyDistrictFacility'), 'Select District', true);
+            resetSelect(document.getElementById('hierarchySubcountyFacility'), 'Select Subcounty', true);
+            resetMultiSelect(document.getElementById('hierarchyFacilities'), 'Select a subcounty first');
+            resetSelect(document.getElementById('hierarchyNewDistrictFacility'), 'Select District', true);
+            resetSelect(document.getElementById('hierarchyNewSubcountyFacility'), 'Select Subcounty', true);
+        }
+
+        function setupHierarchyHandlers() {
+            const regionDistrictSelect = document.getElementById('hierarchyRegionDistrict');
+            const districtMultiSelect = document.getElementById('hierarchyDistricts');
+            if (regionDistrictSelect && districtMultiSelect) {
+                regionDistrictSelect.addEventListener('change', async function () {
+                    resetMultiSelect(districtMultiSelect, 'Select a region first');
+                    const regionId = this.value;
+                    if (regionId) {
+                        await populateDistrictMultiSelect(regionId, districtMultiSelect, 'No districts found');
+                    }
+                });
+            }
+            const moveDistrictsBtn = document.getElementById('moveDistrictsBtn');
+            if (moveDistrictsBtn) moveDistrictsBtn.addEventListener('click', moveDistricts);
+
+            const regionSubcountySelect = document.getElementById('hierarchyRegionSubcounty');
+            const districtSubcountySelect = document.getElementById('hierarchyDistrictSubcounty');
+            const subcountyMultiSelect = document.getElementById('hierarchySubcounties');
+            if (regionSubcountySelect && districtSubcountySelect) {
+                regionSubcountySelect.addEventListener('change', async function () {
+                    const regionId = this.value;
+                    resetSelect(districtSubcountySelect, 'Select District', true);
+                    resetMultiSelect(subcountyMultiSelect, 'Select a district first');
+                    if (regionId) {
+                        await populateDistricts(regionId, districtSubcountySelect, 'Select District');
+                        districtSubcountySelect.disabled = false;
+                    }
+                });
+            }
+            if (districtSubcountySelect && subcountyMultiSelect) {
+                districtSubcountySelect.addEventListener('change', async function () {
+                    const districtId = this.value;
+                    resetMultiSelect(subcountyMultiSelect, 'Select a district first');
+                    if (districtId) {
+                        await populateSubcountyMultiSelect(districtId, subcountyMultiSelect, 'No subcounties found');
+                    }
+                });
+            }
+            const newRegionSubcountySelect = document.getElementById('hierarchyNewRegionSubcounty');
+            const newDistrictSubcountySelect = document.getElementById('hierarchyNewDistrictSubcounty');
+            if (newRegionSubcountySelect && newDistrictSubcountySelect) {
+                newRegionSubcountySelect.addEventListener('change', async function () {
+                    const regionId = this.value;
+                    resetSelect(newDistrictSubcountySelect, 'Select District', true);
+                    if (regionId) {
+                        await populateDistricts(regionId, newDistrictSubcountySelect, 'Select District');
+                        newDistrictSubcountySelect.disabled = false;
+                    }
+                });
+            }
+            const moveSubcountiesBtn = document.getElementById('moveSubcountiesBtn');
+            if (moveSubcountiesBtn) moveSubcountiesBtn.addEventListener('click', moveSubcounties);
+
+            const regionFacilitySelect = document.getElementById('hierarchyRegionFacility');
+            const districtFacilitySelect = document.getElementById('hierarchyDistrictFacility');
+            const subcountyFacilitySelect = document.getElementById('hierarchySubcountyFacility');
+            const facilitiesMultiSelect = document.getElementById('hierarchyFacilities');
+            if (regionFacilitySelect && districtFacilitySelect) {
+                regionFacilitySelect.addEventListener('change', async function () {
+                    const regionId = this.value;
+                    resetSelect(districtFacilitySelect, 'Select District', true);
+                    resetSelect(subcountyFacilitySelect, 'Select Subcounty', true);
+                    resetMultiSelect(facilitiesMultiSelect, 'Select a subcounty first');
+                    if (regionId) {
+                        await populateDistricts(regionId, districtFacilitySelect, 'Select District');
+                        districtFacilitySelect.disabled = false;
+                    }
+                });
+            }
+            if (districtFacilitySelect && subcountyFacilitySelect) {
+                districtFacilitySelect.addEventListener('change', async function () {
+                    const districtId = this.value;
+                    resetSelect(subcountyFacilitySelect, 'Select Subcounty', true);
+                    resetMultiSelect(facilitiesMultiSelect, 'Select a subcounty first');
+                    if (districtId) {
+                        await populateSubcounties(districtId, subcountyFacilitySelect, 'Select Subcounty');
+                        subcountyFacilitySelect.disabled = false;
+                    }
+                });
+            }
+            if (subcountyFacilitySelect && facilitiesMultiSelect) {
+                subcountyFacilitySelect.addEventListener('change', async function () {
+                    const subcountyId = this.value;
+                    resetMultiSelect(facilitiesMultiSelect, 'Select a subcounty first');
+                    if (subcountyId) {
+                        await populateFacilitiesMultiSelect(subcountyId, facilitiesMultiSelect, 'No facilities found');
+                    }
+                });
+            }
+
+            const newRegionFacilitySelect = document.getElementById('hierarchyNewRegionFacility');
+            const newDistrictFacilitySelect = document.getElementById('hierarchyNewDistrictFacility');
+            const newSubcountyFacilitySelect = document.getElementById('hierarchyNewSubcountyFacility');
+            if (newRegionFacilitySelect && newDistrictFacilitySelect) {
+                newRegionFacilitySelect.addEventListener('change', async function () {
+                    const regionId = this.value;
+                    resetSelect(newDistrictFacilitySelect, 'Select District', true);
+                    resetSelect(newSubcountyFacilitySelect, 'Select Subcounty', true);
+                    if (regionId) {
+                        await populateDistricts(regionId, newDistrictFacilitySelect, 'Select District');
+                        newDistrictFacilitySelect.disabled = false;
+                    }
+                });
+            }
+            if (newDistrictFacilitySelect && newSubcountyFacilitySelect) {
+                newDistrictFacilitySelect.addEventListener('change', async function () {
+                    const districtId = this.value;
+                    resetSelect(newSubcountyFacilitySelect, 'Select Subcounty', true);
+                    if (districtId) {
+                        await populateSubcounties(districtId, newSubcountyFacilitySelect, 'Select Subcounty');
+                        newSubcountyFacilitySelect.disabled = false;
+                    }
+                });
+            }
+            const moveFacilitiesBtn = document.getElementById('moveFacilitiesBtn');
+            if (moveFacilitiesBtn) moveFacilitiesBtn.addEventListener('click', moveFacilities);
+        }
+
+        async function populateDistrictMultiSelect(regionId, selectEl, emptyText) {
+            if (!selectEl) return;
+            if (!regionId) {
+                resetMultiSelect(selectEl, 'Select a region first');
+                return;
+            }
+            try {
+                const response = await fetch(`${API_BASE}/districts/${regionId}`, { headers: getAuthHeaders(null) });
+                if (!response.ok) throw new Error('Failed to load districts');
+                const districts = await response.json();
+                if (!Array.isArray(districts) || districts.length === 0) {
+                    selectEl.innerHTML = `<option value="" disabled>${emptyText}</option>`;
+                    selectEl.disabled = true;
+                    return;
+                }
+                selectEl.innerHTML = '';
+                districts.forEach(d => {
+                    const opt = document.createElement('option');
+                    opt.value = d.id;
+                    opt.textContent = d.name;
+                    selectEl.appendChild(opt);
+                });
+                selectEl.disabled = false;
+            } catch (error) {
+                console.error('Error loading districts:', error);
+                selectEl.innerHTML = `<option value="" disabled>Failed to load districts</option>`;
+                selectEl.disabled = true;
+            }
+        }
+
+        async function populateSubcountyMultiSelect(districtId, selectEl, emptyText) {
+            if (!selectEl) return;
+            if (!districtId) {
+                resetMultiSelect(selectEl, 'Select a district first');
+                return;
+            }
+            try {
+                const response = await fetch(`${API_BASE}/subcounties/${districtId}`, { headers: getAuthHeaders(null) });
+                if (!response.ok) throw new Error('Failed to load subcounties');
+                const subcounties = await response.json();
+                if (!Array.isArray(subcounties) || subcounties.length === 0) {
+                    selectEl.innerHTML = `<option value="" disabled>${emptyText}</option>`;
+                    selectEl.disabled = true;
+                    return;
+                }
+                selectEl.innerHTML = '';
+                subcounties.forEach(s => {
+                    const opt = document.createElement('option');
+                    opt.value = s.id;
+                    opt.textContent = s.name;
+                    selectEl.appendChild(opt);
+                });
+                selectEl.disabled = false;
+            } catch (error) {
+                console.error('Error loading subcounties:', error);
+                selectEl.innerHTML = `<option value="" disabled>Failed to load subcounties</option>`;
+                selectEl.disabled = true;
+            }
+        }
+
+        async function populateFacilitiesMultiSelect(subcountyId, selectEl, emptyText) {
+            if (!selectEl) return;
+            if (!subcountyId) {
+                resetMultiSelect(selectEl, 'Select a subcounty first');
+                return;
+            }
+            try {
+                const params = new URLSearchParams({ subcountyId });
+                const response = await fetch(`${API_BASE}/facilities?${params.toString()}`, { headers: getAuthHeaders(null) });
+                if (!response.ok) throw new Error('Failed to load facilities');
+                const facilities = await response.json();
+                if (!Array.isArray(facilities) || facilities.length === 0) {
+                    selectEl.innerHTML = `<option value="" disabled>${emptyText}</option>`;
+                    selectEl.disabled = true;
+                    return;
+                }
+                selectEl.innerHTML = '';
+                facilities.forEach(fac => {
+                    const opt = document.createElement('option');
+                    opt.value = fac.id;
+                    opt.textContent = fac.name;
+                    selectEl.appendChild(opt);
+                });
+                selectEl.disabled = false;
+            } catch (error) {
+                console.error('Error loading facilities:', error);
+                selectEl.innerHTML = `<option value="" disabled>Failed to load facilities</option>`;
+                selectEl.disabled = true;
+            }
+        }
+
+        function getSelectedValues(selectEl) {
+            if (!selectEl) return [];
+            return Array.from(selectEl.selectedOptions || [])
+                .map(opt => parseInt(opt.value, 10))
+                .filter(id => !Number.isNaN(id) && id > 0);
+        }
+
+        function showHierarchyMessage(type, message) {
+            const container = document.getElementById('hierarchyMessage');
+            if (!container) return;
+            const alertType = type === 'danger' || type === 'error' ? 'danger'
+                : type === 'success' ? 'success'
+                : type === 'warning' ? 'warning' : 'info';
+            container.innerHTML = `
+                <div class="alert alert-${alertType} alert-dismissible fade show" role="alert">
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>`;
+        }
+
+        async function moveDistricts() {
+            const districtSelect = document.getElementById('hierarchyDistricts');
+            const newRegionSelect = document.getElementById('hierarchyNewRegionDistrict');
+            const districtIds = getSelectedValues(districtSelect);
+            const newRegionId = parseInt(newRegionSelect?.value || '', 10);
+
+            if (!districtIds.length) {
+                showHierarchyMessage('danger', 'Select at least one district to move.');
+                return;
+            }
+            if (Number.isNaN(newRegionId) || newRegionId <= 0) {
+                showHierarchyMessage('danger', 'Select a destination region.');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/hierarchy/districts/move`, {
+                    method: 'POST',
+                    headers: getAuthHeaders('application/json'),
+                    body: JSON.stringify({ districtIds, newRegionId }),
+                });
+                const payload = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    throw new Error(payload.error || 'Failed to move districts');
+                }
+                showHierarchyMessage('success', payload.message || 'Districts moved successfully.');
+                await loadFacilities();
+                document.getElementById('hierarchyRegionDistrict')?.dispatchEvent(new Event('change'));
+            } catch (error) {
+                console.error('Error moving districts:', error);
+                showHierarchyMessage('danger', error.message || 'Failed to move districts.');
+            }
+        }
+
+        async function moveSubcounties() {
+            const subcountySelect = document.getElementById('hierarchySubcounties');
+            const newDistrictSelect = document.getElementById('hierarchyNewDistrictSubcounty');
+            const subcountyIds = getSelectedValues(subcountySelect);
+            const newDistrictId = parseInt(newDistrictSelect?.value || '', 10);
+
+            if (!subcountyIds.length) {
+                showHierarchyMessage('danger', 'Select at least one subcounty to move.');
+                return;
+            }
+            if (Number.isNaN(newDistrictId) || newDistrictId <= 0) {
+                showHierarchyMessage('danger', 'Select a destination district.');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/hierarchy/subcounties/move`, {
+                    method: 'POST',
+                    headers: getAuthHeaders('application/json'),
+                    body: JSON.stringify({ subcountyIds, newDistrictId }),
+                });
+                const payload = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    throw new Error(payload.error || 'Failed to move subcounties');
+                }
+                showHierarchyMessage('success', payload.message || 'Subcounties moved successfully.');
+                await loadFacilities();
+                document.getElementById('hierarchyDistrictSubcounty')?.dispatchEvent(new Event('change'));
+            } catch (error) {
+                console.error('Error moving subcounties:', error);
+                showHierarchyMessage('danger', error.message || 'Failed to move subcounties.');
+            }
+        }
+
+        async function moveFacilities() {
+            const facilitiesSelect = document.getElementById('hierarchyFacilities');
+            const newSubcountySelect = document.getElementById('hierarchyNewSubcountyFacility');
+            const facilityIds = getSelectedValues(facilitiesSelect);
+            const newSubcountyId = parseInt(newSubcountySelect?.value || '', 10);
+
+            if (!facilityIds.length) {
+                showHierarchyMessage('danger', 'Select at least one facility to move.');
+                return;
+            }
+            if (Number.isNaN(newSubcountyId) || newSubcountyId <= 0) {
+                showHierarchyMessage('danger', 'Select a destination subcounty.');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/hierarchy/facilities/move`, {
+                    method: 'POST',
+                    headers: getAuthHeaders('application/json'),
+                    body: JSON.stringify({ facilityIds, newSubcountyId }),
+                });
+                const payload = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    throw new Error(payload.error || 'Failed to move facilities');
+                }
+                showHierarchyMessage('success', payload.message || 'Facilities moved successfully.');
+                selectedFacility = null;
+                await loadFacilities();
+            } catch (error) {
+                console.error('Error moving facilities:', error);
+                showHierarchyMessage('danger', error.message || 'Failed to move facilities.');
+            }
+        }
+    </script>
+</body>
+</html>
+
+

@@ -1,6 +1,17 @@
 // Assessment form JavaScript
 
 const API_BASE = '/api';
+function getAuthHeaders(contentType = 'application/json') {
+    const headers = {};
+    const token = localStorage.getItem('token');
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+    }
+    if (contentType) {
+        headers['Content-Type'] = contentType;
+    }
+    return headers;
+}
 let assessmentData = {
     typeId: null,
     facilityId: null,
@@ -30,7 +41,7 @@ document.addEventListener('DOMContentLoaded', function() {
 // Load thematic areas and questions
 async function loadThematicAreas() {
     try {
-        const response = await fetch(`${API_BASE}/assessment-types/${assessmentData.typeId}/thematic-areas`);
+        const response = await fetch(`${API_BASE}/assessment-types/${assessmentData.typeId}/thematic-areas`, { headers: getAuthHeaders(null) });
         const thematicAreas = await response.json();
         assessmentData.thematicAreas = thematicAreas;
         
@@ -56,7 +67,7 @@ async function loadThematicAreas() {
 // Load questions for a thematic area
 async function loadQuestions(thematicAreaId) {
     try {
-        const response = await fetch(`${API_BASE}/thematic-areas/${thematicAreaId}/questions`);
+        const response = await fetch(`${API_BASE}/thematic-areas/${thematicAreaId}/questions`, { headers: getAuthHeaders(null) });
         const questions = await response.json();
         return questions;
     } catch (error) {
@@ -112,10 +123,11 @@ function createThematicAreaAccordion(area, index) {
 // Create question item HTML
 function createQuestionItem(question, thematicAreaId) {
     const questionId = question.id;
+    const weight = getQuestionWeight(question);
     const badgeClass = question.isCritical ? 'critical-badge' : 
                        question.isImportant ? 'important-badge' : 'normal-badge';
-    const badgeText = question.isCritical ? 'Critical (10)' : 
-                     question.isImportant ? 'Important (5)' : 'Normal (2)';
+    const badgeText = question.isCritical ? `Critical (${weight})` : 
+                     question.isImportant ? `Important (${weight})` : `Normal (${weight})`;
     
     return `
         <div class="question-item" data-question-id="${questionId}">
@@ -143,38 +155,48 @@ function createQuestionItem(question, thematicAreaId) {
 // Update progress display
 function updateProgress() {
     let totalPossible = 0;
+    let totalPossibleAdjusted = 0;
     let totalAchieved = 0;
     const thematicProgress = {};
     
     // Calculate scores
     assessmentData.thematicAreas.forEach(area => {
-        let areaPossible = 0;
+        let areaPossibleAdjusted = 0;
         let areaAchieved = 0;
         
         area.questions.forEach(question => {
-            const weight = question.scoreWeight;
-            areaPossible += weight;
+            const weight = getQuestionWeight(question);
+            if (weight <= 0) {
+                return;
+            }
             totalPossible += weight;
+            const response = assessmentData.responses[question.id];
             
-            if (assessmentData.responses[question.id] === 'Yes') {
+            if (response === 'Yes') {
                 areaAchieved += weight;
                 totalAchieved += weight;
+                areaPossibleAdjusted += weight;
+            } else if (response === 'NA') {
+                // Exclude NA from adjusted totals
+            } else {
+                areaPossibleAdjusted += weight;
             }
         });
         
-        const areaPercentage = areaPossible > 0 ? (areaAchieved / areaPossible) * 100 : 0;
+        const areaPercentage = areaPossibleAdjusted > 0 ? (areaAchieved / areaPossibleAdjusted) * 100 : 0;
+        totalPossibleAdjusted += areaPossibleAdjusted;
         thematicProgress[area.id] = {
-            possible: areaPossible,
+            possible: areaPossibleAdjusted,
             achieved: areaAchieved,
             percentage: areaPercentage
         };
     });
     
     // Update overall score
-    const overallPercentage = totalPossible > 0 ? (totalAchieved / totalPossible) * 100 : 0;
+    const overallPercentage = totalPossibleAdjusted > 0 ? (totalAchieved / totalPossibleAdjusted) * 100 : 0;
     document.getElementById('overallScore').textContent = overallPercentage.toFixed(1) + '%';
     document.getElementById('overallProgressBar').style.width = overallPercentage + '%';
-    document.getElementById('overallProgressBar').textContent = `${totalAchieved}/${totalPossible}`;
+    document.getElementById('overallProgressBar').textContent = `${totalAchieved}/${totalPossibleAdjusted}`;
     
     // Update thematic area badges
     assessmentData.thematicAreas.forEach(area => {
@@ -218,7 +240,8 @@ async function submitAssessment() {
     let mandatoryUnanswered = 0;
     assessmentData.thematicAreas.forEach(area => {
         area.questions.forEach(question => {
-            if (question.scoreWeight > 2 && !assessmentData.responses[question.id]) {
+            const weight = getQuestionWeight(question);
+            if (weight > 2 && !assessmentData.responses[question.id]) {
                 mandatoryUnanswered++;
             }
         });
@@ -240,9 +263,7 @@ async function submitAssessment() {
         
         const response = await fetch(`${API_BASE}/assessments`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
+            headers: getAuthHeaders('application/json'),
             body: JSON.stringify({
                 facilityId: parseInt(assessmentData.facilityId),
                 assessmentTypeId: parseInt(assessmentData.typeId),
@@ -266,5 +287,13 @@ async function submitAssessment() {
         submitBtn.disabled = false;
         submitBtn.innerHTML = '<i class="bi bi-check-circle"></i> Submit Assessment';
     }
+}
+
+function getQuestionWeight(question) {
+    const weight = Number(question.scoreWeight ?? question.score_weight ?? 0);
+    if (Number.isNaN(weight)) {
+        return 0;
+    }
+    return weight;
 }
 

@@ -103,6 +103,10 @@ func main() {
 	api.Get("/districts/:regionId", handlers.CheckPermission("admin.areas.view"), handlers.GetDistricts)
 	api.Get("/subcounties/:districtId", handlers.CheckPermission("admin.areas.view"), handlers.GetSubcounties)
 	api.Get("/facilities/:subcountyId", handlers.CheckPermission("facilities.view"), handlers.GetFacilities)
+	api.Get("/facilities", handlers.CheckPermission("facilities.view"), handlers.ListFacilities)
+	api.Post("/facilities", handlers.CheckPermission("facilities.manage"), handlers.CreateFacility)
+	api.Put("/facilities/:id", handlers.CheckPermission("facilities.manage"), handlers.UpdateFacility)
+	api.Delete("/facilities/:id", handlers.CheckPermission("facilities.manage"), handlers.DeleteFacility)
 
 	// Assessment routes
 	api.Get("/assessment-types", handlers.CheckPermission("assessments.view"), handlers.GetAssessmentTypes)
@@ -135,6 +139,11 @@ func main() {
 	api.Get("/permissions/predefined", handlers.CheckPermission("roles.view"), handlers.GetPredefinedPermissions)
 	api.Post("/permissions/initialize", handlers.CheckPermission("roles.create"), handlers.InitializePermissionsHandler)
 	api.Delete("/permissions/:id", handlers.CheckPermission("roles.delete"), handlers.DeletePermission)
+
+	// Hierarchy operations
+	api.Post("/hierarchy/districts/move", handlers.CheckPermission("admin.areas.manage"), handlers.MoveDistricts)
+	api.Post("/hierarchy/subcounties/move", handlers.CheckPermission("admin.areas.manage"), handlers.MoveSubcounties)
+	api.Post("/hierarchy/facilities/move", handlers.CheckPermission("admin.areas.manage"), handlers.MoveFacilities)
 
 	// Reports
 	api.Get("/reports/assessments/pdf", handlers.CheckPermission("reports.export"), handlers.ExportAssessmentsPDF)

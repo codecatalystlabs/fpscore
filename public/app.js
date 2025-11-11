@@ -136,7 +136,15 @@ function setupCascadingDropdowns() {
             facilitySelect.innerHTML = '<option value="">Loading...</option>';
             
             try {
-                const response = await fetch(`${API_BASE}/facilities/${subcountyId}`);
+                const params = new URLSearchParams({ subcountyId });
+                const response = await fetch(`${API_BASE}/facilities?${params.toString()}`, { headers: getAuthHeaders(null) });
+                if (!response.ok) {
+                    if (response.status === 403) {
+                        facilitySelect.innerHTML = '<option value="">Permission denied</option>';
+                        return;
+                    }
+                    throw new Error('Failed to load facilities');
+                }
                 const facilities = await response.json();
                 facilitySelect.innerHTML = '<option value="">Select Facility</option>';
                 facilities.forEach(facility => {
