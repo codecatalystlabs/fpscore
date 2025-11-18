@@ -42,16 +42,40 @@ document.addEventListener('DOMContentLoaded', function() {
 async function loadThematicAreas() {
     try {
         const response = await fetch(`${API_BASE}/assessment-types/${assessmentData.typeId}/thematic-areas`, { headers: getAuthHeaders(null) });
+        if (!response.ok) {
+            let errorMsg = 'Failed to load thematic areas';
+            if (response.status === 403) {
+                errorMsg = 'You do not have permission to view this assessment type';
+            } else {
+                try {
+                    const errorData = await response.json();
+                    errorMsg = errorData.error || errorMsg;
+                } catch (_) {
+                    errorMsg = `${errorMsg} (${response.status})`;
+                }
+            }
+            throw new Error(errorMsg);
+        }
         const thematicAreas = await response.json();
+        
+        // Ensure we got an array
+        if (!Array.isArray(thematicAreas)) {
+            throw new Error('Invalid response format: expected array of thematic areas');
+        }
+        
         assessmentData.thematicAreas = thematicAreas;
         
         const accordion = document.getElementById('thematicAreasAccordion');
+        if (!accordion) {
+            throw new Error('Thematic areas accordion element not found');
+        }
         accordion.innerHTML = '';
         
         for (let i = 0; i < thematicAreas.length; i++) {
             const area = thematicAreas[i];
             const questions = await loadQuestions(area.id);
-            area.questions = questions;
+            // Ensure questions is always an array
+            area.questions = Array.isArray(questions) ? questions : [];
             
             const accordionItem = createThematicAreaAccordion(area, i);
             accordion.appendChild(accordionItem);
@@ -60,7 +84,10 @@ async function loadThematicAreas() {
         updateProgress();
     } catch (error) {
         console.error('Error loading thematic areas:', error);
-        alert('Error loading assessment data. Please try again.');
+        // Reset to empty array on error
+        assessmentData.thematicAreas = [];
+        alert(`Error loading assessment data: ${error.message || 'Unknown error'}. Please try again.`);
+        // Don't call updateProgress on error - it will show 0% which is misleading
     }
 }
 
@@ -68,6 +95,19 @@ async function loadThematicAreas() {
 async function loadQuestions(thematicAreaId) {
     try {
         const response = await fetch(`${API_BASE}/thematic-areas/${thematicAreaId}/questions`, { headers: getAuthHeaders(null) });
+        if (!response.ok) {
+            if (response.status === 403) {
+                throw new Error('Permission denied for questions');
+            }
+            let errorMsg = 'Failed to load questions';
+            try {
+                const errorData = await response.json();
+                errorMsg = errorData.error || errorMsg;
+            } catch (_) {
+                errorMsg = `${errorMsg} (${response.status})`;
+            }
+            throw new Error(errorMsg);
+        }
         const questions = await response.json();
         return questions;
     } catch (error) {
@@ -78,6 +118,12 @@ async function loadQuestions(thematicAreaId) {
 
 // Create accordion item for thematic area
 function createThematicAreaAccordion(area, index) {
+    if (!area) {
+        return document.createElement('div');
+    }
+    if (!Array.isArray(area.questions)) {
+        area.questions = [];
+    }
     const item = document.createElement('div');
     item.className = 'accordion-item';
     
@@ -96,7 +142,7 @@ function createThematicAreaAccordion(area, index) {
              data-bs-parent="#thematicAreasAccordion">
             <div class="accordion-body">
                 <div id="questions-${area.id}">
-                    ${area.questions.map(q => createQuestionItem(q, area.id)).join('')}
+                    ${(area.questions && Array.isArray(area.questions) ? area.questions : []).map(q => createQuestionItem(q, area.id)).join('')}
                 </div>
             </div>
         </div>
@@ -154,6 +200,11 @@ function createQuestionItem(question, thematicAreaId) {
 
 // Update progress display
 function updateProgress() {
+    // Ensure thematicAreas is always an array
+    if (!assessmentData.thematicAreas || !Array.isArray(assessmentData.thematicAreas)) {
+        assessmentData.thematicAreas = [];
+    }
+    
     let totalPossible = 0;
     let totalPossibleAdjusted = 0;
     let totalAchieved = 0;
@@ -161,6 +212,10 @@ function updateProgress() {
     
     // Calculate scores
     assessmentData.thematicAreas.forEach(area => {
+        // Ensure area.questions is an array
+        if (!area.questions || !Array.isArray(area.questions)) {
+            area.questions = [];
+        }
         let areaPossibleAdjusted = 0;
         let areaAchieved = 0;
         
@@ -194,9 +249,15 @@ function updateProgress() {
     
     // Update overall score
     const overallPercentage = totalPossibleAdjusted > 0 ? (totalAchieved / totalPossibleAdjusted) * 100 : 0;
-    document.getElementById('overallScore').textContent = overallPercentage.toFixed(1) + '%';
-    document.getElementById('overallProgressBar').style.width = overallPercentage + '%';
-    document.getElementById('overallProgressBar').textContent = `${totalAchieved}/${totalPossibleAdjusted}`;
+    const overallScoreEl = document.getElementById('overallScore');
+    const overallProgressBarEl = document.getElementById('overallProgressBar');
+    if (overallScoreEl) {
+        overallScoreEl.textContent = overallPercentage.toFixed(1) + '%';
+    }
+    if (overallProgressBarEl) {
+        overallProgressBarEl.style.width = overallPercentage + '%';
+        overallProgressBarEl.textContent = `${totalAchieved}/${totalPossibleAdjusted}`;
+    }
     
     // Update thematic area badges
     assessmentData.thematicAreas.forEach(area => {
@@ -216,8 +277,9 @@ function updateProgress() {
     
     // Update thematic progress sidebar
     const container = document.getElementById('thematicProgress');
-    container.innerHTML = '<h6 class="mb-2">By Area</h6>';
-    assessmentData.thematicAreas.forEach(area => {
+    if (container) {
+        container.innerHTML = '<h6 class="mb-2">By Area</h6>';
+        assessmentData.thematicAreas.forEach(area => {
         const progress = thematicProgress[area.id];
         const div = document.createElement('div');
         div.className = 'mb-2';
@@ -230,15 +292,26 @@ function updateProgress() {
                 <div class="progress-bar" role="progressbar" style="width: ${progress.percentage}%"></div>
             </div>
         `;
-        container.appendChild(div);
-    });
+            container.appendChild(div);
+        });
+    }
 }
 
 // Submit assessment
 async function submitAssessment() {
+    // Ensure thematicAreas is loaded
+    if (!assessmentData.thematicAreas || !Array.isArray(assessmentData.thematicAreas) || assessmentData.thematicAreas.length === 0) {
+        alert('Assessment data is not loaded. Please refresh the page and try again.');
+        return;
+    }
+    
     // Validate: all questions with weight > 2 must have a response
     let mandatoryUnanswered = 0;
     assessmentData.thematicAreas.forEach(area => {
+        // Ensure area.questions is an array
+        if (!area.questions || !Array.isArray(area.questions)) {
+            return; // Skip this area if questions are not loaded
+        }
         area.questions.forEach(question => {
             const weight = getQuestionWeight(question);
             if (weight > 2 && !assessmentData.responses[question.id]) {

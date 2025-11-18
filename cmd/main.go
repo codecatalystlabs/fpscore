@@ -98,12 +98,15 @@ func main() {
 	api := app.Group("/api", handlers.AuthMiddleware)
 	api.Post("/auth/change-password", handlers.ChangePassword)
 
-	// Geographic hierarchy routes (view only - needs admin.areas.view or facilities.view)
+	// User admin areas
+	api.Get("/user/admin-areas", handlers.GetUserAdminAreasWithDetails)
+
+	// Geographic hierarchy routes (view only - needs admin.areas.view)
 	api.Get("/regions", handlers.CheckPermission("admin.areas.view"), handlers.GetRegions)
 	api.Get("/districts/:regionId", handlers.CheckPermission("admin.areas.view"), handlers.GetDistricts)
 	api.Get("/subcounties/:districtId", handlers.CheckPermission("admin.areas.view"), handlers.GetSubcounties)
-	api.Get("/facilities/:subcountyId", handlers.CheckPermission("facilities.view"), handlers.GetFacilities)
-	api.Get("/facilities", handlers.CheckPermission("facilities.view"), handlers.ListFacilities)
+	api.Get("/facilities/:subcountyId", handlers.CheckPermission("admin.areas.view"), handlers.GetFacilities)
+	api.Get("/facilities", handlers.CheckAnyPermission("admin.areas.view", "facilities.view"), handlers.ListFacilities)
 	api.Post("/facilities", handlers.CheckPermission("facilities.manage"), handlers.CreateFacility)
 	api.Put("/facilities/:id", handlers.CheckPermission("facilities.manage"), handlers.UpdateFacility)
 	api.Delete("/facilities/:id", handlers.CheckPermission("facilities.manage"), handlers.DeleteFacility)

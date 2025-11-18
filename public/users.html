@@ -87,13 +87,33 @@
                                             </div>
                                             <input type="hidden" id="roleIds" name="roleIds">
                                         </div>
-                                        <div class="col-md-6">
+                                        <div class="col-md-12">
                                             <label class="form-label">Admin Areas (add multiple)</label>
-                                            <div class="input-group">
-                                                <select class="form-select" id="areaRegion"></select>
-                                                <select class="form-select" id="areaDistrict"></select>
-                                                <button class="btn btn-outline-secondary" type="button" onclick="addArea()">Add</button>
+                                            <div class="row g-2 mb-2">
+                                                <div class="col-md-3">
+                                                    <select class="form-select form-select-sm" id="areaRegion">
+                                                        <option value="">Select Region</option>
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-3">
+                                                    <select class="form-select form-select-sm" id="areaDistrict" disabled>
+                                                        <option value="">Select District</option>
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-3">
+                                                    <select class="form-select form-select-sm" id="areaSubcounty" disabled>
+                                                        <option value="">Select Subcounty</option>
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-3">
+                                                    <select class="form-select form-select-sm" id="areaFacility" disabled>
+                                                        <option value="">Select Facility</option>
+                                                    </select>
+                                                </div>
                                             </div>
+                                            <button class="btn btn-outline-secondary btn-sm" type="button" onclick="addArea()">
+                                                <i class="bi bi-plus"></i> Add Area
+                                            </button>
                                             <ul class="list-group mt-2" id="areasList"></ul>
                                         </div>
                                     </div>
@@ -178,30 +198,64 @@
                 });
                 updateRoleIds();
             }
-            // Set existing admin areas
-            currentAreas = data.adminAreas || [];
-            const areasList = document.getElementById('areasList');
-            areasList.innerHTML = '';
-            currentAreas.forEach((area, idx) => {
-                const li = document.createElement('li');
-                li.className = 'list-group-item d-flex justify-content-between align-items-center';
-                let text = '';
-                if (area.regionId) {
-                    const rOpt = document.getElementById('areaRegion').querySelector(`option[value="${area.regionId}"]`);
-                    text = rOpt ? rOpt.textContent : `Region ${area.regionId}`;
+            // Set existing admin areas - need to load hierarchy data for display
+            currentAreas = (data.adminAreas || []).map(area => ({
+                regionId: area.regionId || null,
+                districtId: area.districtId || null,
+                subcountyId: area.subcountyId || null,
+                facilityId: area.facilityId || null
+            }));
+            
+            // Load subcounties and facilities for existing areas if needed
+            for (const area of currentAreas) {
+                if (area.districtId && !document.getElementById('areaDistrict').querySelector(`option[value="${area.districtId}"]`)) {
+                    // Need to load districts for the region
+                    const regionId = area.regionId;
+                    if (regionId) {
+                        const districts = await fetch(`${API_BASE}/districts/${regionId}`, {headers: getAuthHeaders()}).then(r=>r.json());
+                        districts.forEach(d => {
+                            if (!document.getElementById('areaDistrict').querySelector(`option[value="${d.id}"]`)) {
+                                const opt = document.createElement('option');
+                                opt.value = d.id;
+                                opt.textContent = d.name;
+                                document.getElementById('areaDistrict').appendChild(opt);
+                            }
+                        });
+                    }
                 }
-                if (area.districtId) {
-                    const dOpt = document.getElementById('areaDistrict').querySelector(`option[value="${area.districtId}"]`);
-                    text += (text ? ' / ' : '') + (dOpt ? dOpt.textContent : `District ${area.districtId}`);
+                if (area.subcountyId && !document.getElementById('areaSubcounty').querySelector(`option[value="${area.subcountyId}"]`)) {
+                    // Need to load subcounties for the district
+                    const districtId = area.districtId;
+                    if (districtId) {
+                        const subcounties = await fetch(`${API_BASE}/subcounties/${districtId}`, {headers: getAuthHeaders()}).then(r=>r.json());
+                        subcounties.forEach(s => {
+                            if (!document.getElementById('areaSubcounty').querySelector(`option[value="${s.id}"]`)) {
+                                const opt = document.createElement('option');
+                                opt.value = s.id;
+                                opt.textContent = s.name;
+                                document.getElementById('areaSubcounty').appendChild(opt);
+                            }
+                        });
+                    }
                 }
-                li.textContent = text || 'Area';
-                const btn = document.createElement('button');
-                btn.className = 'btn btn-sm btn-outline-danger';
-                btn.textContent = 'Remove';
-                btn.onclick = () => { currentAreas.splice(idx, 1); li.remove(); };
-                li.appendChild(btn);
-                areasList.appendChild(li);
-            });
+                if (area.facilityId && !document.getElementById('areaFacility').querySelector(`option[value="${area.facilityId}"]`)) {
+                    // Need to load facilities for the subcounty
+                    const subcountyId = area.subcountyId;
+                    if (subcountyId) {
+                        const facilities = await fetch(`${API_BASE}/facilities/${subcountyId}`, {headers: getAuthHeaders()}).then(r=>r.json());
+                        facilities.forEach(f => {
+                            if (!document.getElementById('areaFacility').querySelector(`option[value="${f.id}"]`)) {
+                                const opt = document.createElement('option');
+                                opt.value = f.id;
+                                opt.textContent = f.name;
+                                document.getElementById('areaFacility').appendChild(opt);
+                            }
+                        });
+                    }
+                }
+            }
+            
+            updateAreasList();
             userModal = new bootstrap.Modal(document.getElementById('userModal'));
             userModal.show();
         }
@@ -274,44 +328,206 @@
             document.getElementById('roleIds').value = roleIds.join(',');
         }
 
+        // Setup cascading dropdowns for admin areas
         document.getElementById('areaRegion').addEventListener('change', async function(){
-            const regionId = this.value; const sel = document.getElementById('areaDistrict');
-            if (!regionId) { sel.innerHTML = '<option value="">District</option>'; return; }
+            const regionId = this.value;
+            const districtSel = document.getElementById('areaDistrict');
+            const subcountySel = document.getElementById('areaSubcounty');
+            const facilitySel = document.getElementById('areaFacility');
+            
+            if (!regionId) {
+                districtSel.innerHTML = '<option value="">Select District</option>';
+                districtSel.disabled = true;
+                subcountySel.innerHTML = '<option value="">Select Subcounty</option>';
+                subcountySel.disabled = true;
+                facilitySel.innerHTML = '<option value="">Select Facility</option>';
+                facilitySel.disabled = true;
+                return;
+            }
+            
             const districts = await fetch(`${API_BASE}/districts/${regionId}`, {headers: getAuthHeaders()}).then(r=>r.json());
-            sel.innerHTML = '<option value="">District</option>';
-            districts.forEach(d=>{ const o=document.createElement('option'); o.value=d.id; o.textContent=d.name; sel.appendChild(o); });
+            districtSel.innerHTML = '<option value="">Select District</option>';
+            districts.forEach(d => {
+                const o = document.createElement('option');
+                o.value = d.id;
+                o.textContent = d.name;
+                districtSel.appendChild(o);
+            });
+            districtSel.disabled = false;
+            
+            // Reset child dropdowns
+            subcountySel.innerHTML = '<option value="">Select Subcounty</option>';
+            subcountySel.disabled = true;
+            facilitySel.innerHTML = '<option value="">Select Facility</option>';
+            facilitySel.disabled = true;
         });
+
+        document.getElementById('areaDistrict').addEventListener('change', async function(){
+            const districtId = this.value;
+            const subcountySel = document.getElementById('areaSubcounty');
+            const facilitySel = document.getElementById('areaFacility');
+            
+            if (!districtId) {
+                subcountySel.innerHTML = '<option value="">Select Subcounty</option>';
+                subcountySel.disabled = true;
+                facilitySel.innerHTML = '<option value="">Select Facility</option>';
+                facilitySel.disabled = true;
+                return;
+            }
+            
+            const subcounties = await fetch(`${API_BASE}/subcounties/${districtId}`, {headers: getAuthHeaders()}).then(r=>r.json());
+            subcountySel.innerHTML = '<option value="">Select Subcounty</option>';
+            subcounties.forEach(s => {
+                const o = document.createElement('option');
+                o.value = s.id;
+                o.textContent = s.name;
+                subcountySel.appendChild(o);
+            });
+            subcountySel.disabled = false;
+            
+            // Reset facility dropdown
+            facilitySel.innerHTML = '<option value="">Select Facility</option>';
+            facilitySel.disabled = true;
+        });
+
+        document.getElementById('areaSubcounty').addEventListener('change', async function(){
+            const subcountyId = this.value;
+            const facilitySel = document.getElementById('areaFacility');
+            
+            if (!subcountyId) {
+                facilitySel.innerHTML = '<option value="">Select Facility</option>';
+                facilitySel.disabled = true;
+                return;
+            }
+            
+            const facilities = await fetch(`${API_BASE}/facilities/${subcountyId}`, {headers: getAuthHeaders()}).then(r=>r.json());
+            facilitySel.innerHTML = '<option value="">Select Facility</option>';
+            facilities.forEach(f => {
+                const o = document.createElement('option');
+                o.value = f.id;
+                o.textContent = f.name;
+                facilitySel.appendChild(o);
+            });
+            facilitySel.disabled = false;
+        });
+
+        function updateAreasList() {
+            const areasList = document.getElementById('areasList');
+            areasList.innerHTML = '';
+            currentAreas.forEach((area, idx) => {
+                const li = document.createElement('li');
+                li.className = 'list-group-item d-flex justify-content-between align-items-center';
+                let text = '';
+                if (area.facilityId) {
+                    const fOpt = document.getElementById('areaFacility').querySelector(`option[value="${area.facilityId}"]`);
+                    text = fOpt ? fOpt.textContent : `Facility ${area.facilityId}`;
+                } else if (area.subcountyId) {
+                    const sOpt = document.getElementById('areaSubcounty').querySelector(`option[value="${area.subcountyId}"]`);
+                    text = sOpt ? sOpt.textContent : `Subcounty ${area.subcountyId}`;
+                } else if (area.districtId) {
+                    const dOpt = document.getElementById('areaDistrict').querySelector(`option[value="${area.districtId}"]`);
+                    text = dOpt ? dOpt.textContent : `District ${area.districtId}`;
+                } else if (area.regionId) {
+                    const rOpt = document.getElementById('areaRegion').querySelector(`option[value="${area.regionId}"]`);
+                    text = rOpt ? rOpt.textContent : `Region ${area.regionId}`;
+                }
+                li.textContent = text || 'Area';
+                const btn = document.createElement('button');
+                btn.className = 'btn btn-sm btn-outline-danger';
+                btn.textContent = 'Remove';
+                btn.onclick = () => {
+                    currentAreas.splice(idx, 1);
+                    updateAreasList();
+                };
+                li.appendChild(btn);
+                areasList.appendChild(li);
+            });
+        }
 
         function addArea() {
             const r = document.getElementById('areaRegion').value;
-            const rText = document.getElementById('areaRegion').selectedOptions[0]?.textContent;
             const d = document.getElementById('areaDistrict').value;
-            const dText = document.getElementById('areaDistrict').selectedOptions[0]?.textContent;
-            if (!r && !d) return;
-            currentAreas.push({regionId: r?parseInt(r):null, districtId: d?parseInt(d):null});
-            const li = document.createElement('li');
-            li.className = 'list-group-item d-flex justify-content-between align-items-center';
-            li.textContent = `${rText || ''} ${dText ? ' / '+dText : ''}`;
-            const btn = document.createElement('button'); btn.className='btn btn-sm btn-outline-danger'; btn.textContent='Remove'; btn.onclick=()=>{ li.remove(); };
-            li.appendChild(btn); document.getElementById('areasList').appendChild(li);
+            const s = document.getElementById('areaSubcounty').value;
+            const f = document.getElementById('areaFacility').value;
+            
+            // Must have at least one level selected
+            if (!r && !d && !s && !f) {
+                alert('Please select at least one administrative area');
+                return;
+            }
+            
+            // Determine the highest level selected
+            const area = {
+                regionId: r ? parseInt(r) : null,
+                districtId: d ? parseInt(d) : null,
+                subcountyId: s ? parseInt(s) : null,
+                facilityId: f ? parseInt(f) : null
+            };
+            
+            // Only keep the highest level - if facility is selected, only keep facility
+            // If subcounty is selected, only keep subcounty and above, etc.
+            if (area.facilityId) {
+                // Facility level - keep all hierarchy
+            } else if (area.subcountyId) {
+                // Subcounty level - remove facility
+                area.facilityId = null;
+            } else if (area.districtId) {
+                // District level - remove subcounty and facility
+                area.subcountyId = null;
+                area.facilityId = null;
+            } else if (area.regionId) {
+                // Region level - remove district, subcounty, and facility
+                area.districtId = null;
+                area.subcountyId = null;
+                area.facilityId = null;
+            }
+            
+            currentAreas.push(area);
+            updateAreasList();
+            
+            // Reset dropdowns
+            document.getElementById('areaRegion').value = '';
+            document.getElementById('areaDistrict').innerHTML = '<option value="">Select District</option>';
+            document.getElementById('areaDistrict').disabled = true;
+            document.getElementById('areaSubcounty').innerHTML = '<option value="">Select Subcounty</option>';
+            document.getElementById('areaSubcounty').disabled = true;
+            document.getElementById('areaFacility').innerHTML = '<option value="">Select Facility</option>';
+            document.getElementById('areaFacility').disabled = true;
         }
 
         async function saveUser() {
             const roleIdsValue = document.getElementById('roleIds').value;
             const roleIds = roleIdsValue ? roleIdsValue.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id)) : [];
+            
+            // Format admin areas to match backend expectations
+            const adminAreas = currentAreas.map(area => ({
+                regionId: area.regionId || null,
+                districtId: area.districtId || null,
+                subcountyId: area.subcountyId || null,
+                facilityId: area.facilityId || null
+            }));
+            
             const payload = {
                 name: document.getElementById('name').value,
                 email: document.getElementById('email').value,
                 password: document.getElementById('password').value,
                 isActive: document.getElementById('isActive').value === 'true',
                 roleIds: roleIds,
-                adminAreas: currentAreas
+                adminAreas: adminAreas
             };
+            
+            console.log('Saving user with payload:', JSON.stringify(payload, null, 2));
+            
             const id = document.getElementById('userId').value;
             const method = id ? 'PUT' : 'POST';
             const url = id ? `${API_BASE}/users/${id}` : `${API_BASE}/users`;
             const resp = await fetch(url, {method, headers: getAuthHeaders(), body: JSON.stringify(payload)});
-            if (!resp.ok) { alert('Save failed'); return; }
+            if (!resp.ok) {
+                const errorText = await resp.text();
+                console.error('Save failed:', errorText);
+                alert('Save failed: ' + errorText);
+                return;
+            }
             bootstrap.Modal.getInstance(document.getElementById('userModal')).hide();
             loadUsers();
         }

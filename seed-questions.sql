@@ -77,6 +77,20 @@ INSERT INTO thematic_areas (assessment_type_id, name, display_order) VALUES
 (1, 'Assesses the client''s medical eligibility for the chosen method using the appropriate checklist', 5)
 ON CONFLICT DO NOTHING;
 
+INSERT INTO questions (thematic_area_id, question_text, score_weight, is_critical, is_important, display_order)
+SELECT ta.id, q.question_text, q.score_weight, q.is_critical, q.is_important, q.display_order
+FROM thematic_areas ta,
+(VALUES
+    ('Reviews client history and documents all relevant conditions using the medical eligibility checklist', 5, false, true, 1),
+    ('Rules out pregnancy using the WHO/MOH pregnancy checklist before proceeding', 5, false, true, 2),
+    ('Screens for contraindications (hypertension, postpartum status, thrombosis, etc.) and documents findings', 5, false, true, 3),
+    ('Records the required observations (e.g., BP, temperature, weight) needed to confirm eligibility', 2, false, false, 4),
+    ('Documents the eligibility decision, counselling provided, and any referral or follow-up plan', 2, false, false, 5)
+) AS q(question_text, score_weight, is_critical, is_important, display_order)
+WHERE ta.assessment_type_id = 1 
+  AND ta.name = 'Assesses the client''s medical eligibility for the chosen method using the appropriate checklist'
+ON CONFLICT DO NOTHING;
+
 -- Client Scenarios
 INSERT INTO thematic_areas (assessment_type_id, name, display_order) VALUES
 (1, 'Return visit of client satisfied with FP method', 6),

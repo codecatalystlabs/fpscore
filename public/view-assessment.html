@@ -45,6 +45,10 @@
             background: #f8d7da;
             border-color: #dc3545;
         }
+        .contribution-na {
+            background: #e2e3e5;
+            border-color: #6c757d;
+        }
         .thematic-score {
             margin-bottom: 1rem;
         }
@@ -59,7 +63,7 @@
                         <i class="bi bi-clipboard-data"></i> Assessment Details
                     </h4>
                 </div>
-                <a href="index.html" class="btn btn-light btn-sm">
+                <a href="home.html" class="btn btn-light btn-sm">
                     <i class="bi bi-arrow-left"></i> Back
                 </a>
             </div>
@@ -105,28 +109,40 @@
             </div>
         </div>
 
-        <!-- Score Contributions -->
+        <!-- Response Summary -->
         <div class="row">
-            <div class="col-md-6">
+            <div class="col-md-4">
                 <div class="card mb-4">
                     <div class="card-body">
                         <h5 class="card-title text-success">
-                            <i class="bi bi-check-circle"></i> Positive Contributions
+                            <i class="bi bi-check-circle"></i> Questions Answered Yes
                         </h5>
-                        <div id="goodContributions">
-                            <!-- Good contributions will be loaded here -->
+                        <div id="yesResponses">
+                            <!-- Yes responses will be loaded here -->
                         </div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-6">
+            <div class="col-md-4">
                 <div class="card mb-4">
                     <div class="card-body">
                         <h5 class="card-title text-danger">
-                            <i class="bi bi-x-circle"></i> Areas for Improvement
+                            <i class="bi bi-x-circle"></i> Questions Answered No
                         </h5>
-                        <div id="badContributions">
-                            <!-- Bad contributions will be loaded here -->
+                        <div id="noResponses">
+                            <!-- No responses will be loaded here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <h5 class="card-title text-secondary">
+                            <i class="bi bi-dash-circle"></i> Questions Not Applicable
+                        </h5>
+                        <div id="naResponses">
+                            <!-- N/A responses will be loaded here -->
                         </div>
                     </div>
                 </div>

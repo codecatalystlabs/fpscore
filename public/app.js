@@ -2,6 +2,18 @@
 
 const API_BASE = '/api';
 
+function getAuthHeaders(contentType = 'application/json') {
+    const headers = {};
+    const token = localStorage.getItem('token');
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+    }
+    if (contentType) {
+        headers['Content-Type'] = contentType;
+    }
+    return headers;
+}
+
 // Load regions on page load
 document.addEventListener('DOMContentLoaded', function() {
     loadRegions();
@@ -28,13 +40,30 @@ async function loadRegions() {
         }
         const regions = await response.json();
         const select = document.getElementById('regionSelect');
-        select.innerHTML = '<option value="">Select Region</option>';
-        regions.forEach(region => {
-            const option = document.createElement('option');
-            option.value = region.id;
-            option.textContent = region.name;
-            select.appendChild(option);
-        });
+        if (!select) return;
+        
+        // Check if this dropdown is restricted - if so, don't clear it
+        const isRestricted = select.disabled && select.classList.contains('bg-light');
+        if (!isRestricted) {
+            select.innerHTML = '<option value="">Select Region</option>';
+            regions.forEach(region => {
+                const option = document.createElement('option');
+                option.value = region.id;
+                option.textContent = region.name;
+                select.appendChild(option);
+            });
+        } else {
+            // If restricted, only add options that aren't already there
+            const existingValues = Array.from(select.options).map(opt => opt.value);
+            regions.forEach(region => {
+                if (!existingValues.includes(String(region.id))) {
+                    const option = document.createElement('option');
+                    option.value = region.id;
+                    option.textContent = region.name;
+                    select.appendChild(option);
+                }
+            });
+        }
     } catch (error) {
         console.error('Error loading regions:', error);
     }
@@ -50,11 +79,19 @@ function setupCascadingDropdowns() {
     regionSelect.addEventListener('change', async function() {
         const regionId = this.value;
         if (regionId) {
-            districtSelect.disabled = false;
+            // Only enable if not already disabled by restrictions
+            if (!districtSelect.classList.contains('bg-light')) {
+                districtSelect.disabled = false;
+            }
             districtSelect.innerHTML = '<option value="">Loading...</option>';
-            subcountySelect.disabled = true;
+            // Only disable if not restricted (restricted dropdowns should stay disabled)
+            if (!subcountySelect.classList.contains('bg-light')) {
+                subcountySelect.disabled = true;
+            }
             subcountySelect.innerHTML = '<option value="">Select Subcounty</option>';
-            facilitySelect.disabled = true;
+            if (!facilitySelect.classList.contains('bg-light')) {
+                facilitySelect.disabled = true;
+            }
             facilitySelect.innerHTML = '<option value="">Select Facility</option>';
             
             try {
@@ -92,7 +129,10 @@ function setupCascadingDropdowns() {
     districtSelect.addEventListener('change', async function() {
         const districtId = this.value;
         if (districtId) {
-            subcountySelect.disabled = false;
+            // Only enable if not already disabled by restrictions
+            if (!subcountySelect.classList.contains('bg-light')) {
+                subcountySelect.disabled = false;
+            }
             subcountySelect.innerHTML = '<option value="">Loading...</option>';
             facilitySelect.disabled = true;
             facilitySelect.innerHTML = '<option value="">Select Facility</option>';
@@ -124,7 +164,10 @@ function setupCascadingDropdowns() {
                 console.error('Error loading subcounties:', error);
             }
         } else {
-            subcountySelect.disabled = true;
+            // Only disable if not restricted (restricted dropdowns should stay disabled)
+            if (!subcountySelect.classList.contains('bg-light')) {
+                subcountySelect.disabled = true;
+            }
             subcountySelect.innerHTML = '<option value="">Select Subcounty</option>';
         }
     });
@@ -132,21 +175,46 @@ function setupCascadingDropdowns() {
     subcountySelect.addEventListener('change', async function() {
         const subcountyId = this.value;
         if (subcountyId) {
-            facilitySelect.disabled = false;
+            // Only enable if not already disabled by restrictions
+            if (!facilitySelect.classList.contains('bg-light')) {
+                facilitySelect.disabled = false;
+            }
             facilitySelect.innerHTML = '<option value="">Loading...</option>';
             
             try {
-                const params = new URLSearchParams({ subcountyId });
-                const response = await fetch(`${API_BASE}/facilities?${params.toString()}`, { headers: getAuthHeaders(null) });
+                const response = await fetch(`${API_BASE}/facilities/${subcountyId}`, { headers: getAuthHeaders(null) });
                 if (!response.ok) {
                     if (response.status === 403) {
                         facilitySelect.innerHTML = '<option value="">Permission denied</option>';
                         return;
                     }
-                    throw new Error('Failed to load facilities');
+                    if (response.status === 401) {
+                        facilitySelect.innerHTML = '<option value="">Unauthorized - please login again</option>';
+                        console.error('Unauthorized: Token may be expired');
+                        return;
+                    }
+                    let errorMsg = 'Failed to load facilities';
+                    try {
+                        const errorData = await response.json();
+                        errorMsg = errorData.error || errorMsg;
+                    } catch (e) {
+                        errorMsg = `Failed to load facilities (${response.status})`;
+                    }
+                    facilitySelect.innerHTML = `<option value="">Error: ${errorMsg}</option>`;
+                    console.error('Error loading facilities:', errorMsg);
+                    return;
                 }
                 const facilities = await response.json();
+                if (!Array.isArray(facilities)) {
+                    console.error('Invalid response format:', facilities);
+                    facilitySelect.innerHTML = '<option value="">Error: Invalid response</option>';
+                    return;
+                }
                 facilitySelect.innerHTML = '<option value="">Select Facility</option>';
+                if (facilities.length === 0) {
+                    facilitySelect.innerHTML = '<option value="">No facilities found</option>';
+                    return;
+                }
                 facilities.forEach(facility => {
                     const option = document.createElement('option');
                     option.value = facility.id;
@@ -155,6 +223,7 @@ function setupCascadingDropdowns() {
                 });
             } catch (error) {
                 console.error('Error loading facilities:', error);
+                facilitySelect.innerHTML = `<option value="">Error: ${error.message || 'Unknown error'}</option>`;
             }
         } else {
             facilitySelect.disabled = true;

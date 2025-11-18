@@ -13,7 +13,7 @@ type Config struct {
 func Load() (*Config, error) {
 	config := &Config{
 		DatabaseURL: getEnv("DATABASE_URL", "postgres://postgres:pwaiswa@localhost/fpscore?sslmode=disable"),
-		Port:        getEnv("PORT", "3000"),
+		Port:        getEnv("PORT", "5000"),
 	}
 
 	if config.DatabaseURL == "" {

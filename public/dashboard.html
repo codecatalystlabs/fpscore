@@ -164,6 +164,11 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="navigation.js"></script>
     <script>
+        // Declare API_BASE before loading admin-restrictions.js
+        window.API_BASE = '/api';
+    </script>
+    <script src="admin-restrictions.js"></script>
+    <script>
         const API_BASE = '/api';
         let filters = {};
         const charts = {
@@ -196,12 +201,23 @@
                     fetch(`${API_BASE}/regions`, {headers: getAuthHeaders()}).then(r=>r.json()),
                     fetch(`${API_BASE}/assessment-types`, {headers: getAuthHeaders()}).then(r=>r.json())
                 ]);
-                regions.forEach(r => {
-                    const opt = document.createElement('option');
-                    opt.value = r.id;
-                    opt.textContent = r.name;
-                    document.getElementById('filterRegion').appendChild(opt);
-                });
+                const regionSelect = document.getElementById('filterRegion');
+                if (regionSelect) {
+                    // Check if this dropdown is restricted - if so, don't clear it
+                    const isRestricted = regionSelect.disabled && regionSelect.classList.contains('bg-light');
+                    if (!isRestricted) {
+                        // Only clear if not restricted
+                        const existingValues = Array.from(regionSelect.options).map(opt => opt.value);
+                        regions.forEach(r => {
+                            if (!existingValues.includes(String(r.id))) {
+                                const opt = document.createElement('option');
+                                opt.value = r.id;
+                                opt.textContent = r.name;
+                                regionSelect.appendChild(opt);
+                            }
+                        });
+                    }
+                }
                 types.forEach(t => {
                     const opt = document.createElement('option');
                     opt.value = t.id;
@@ -257,10 +273,10 @@
 
         function applyFilters() {
             filters = {
-                regionId: document.getElementById('filterRegion').value,
-                districtId: document.getElementById('filterDistrict').value,
-                assessmentTypeId: document.getElementById('filterAssessmentType').value,
-                thematicAreaId: document.getElementById('filterThematicArea').value
+                regionId: document.getElementById('filterRegion').value || '',
+                districtId: document.getElementById('filterDistrict').value || '',
+                assessmentTypeId: document.getElementById('filterAssessmentType').value || '',
+                thematicAreaId: document.getElementById('filterThematicArea').value || ''
             };
             loadDashboard();
         }
@@ -280,10 +296,10 @@
             try {
                 let url = `${API_BASE}/assessments`;
                 const params = new URLSearchParams();
-                if (filters.regionId) params.append('regionId', filters.regionId);
-                if (filters.districtId) params.append('districtId', filters.districtId);
-                if (filters.assessmentTypeId) params.append('assessmentTypeId', filters.assessmentTypeId);
-                if (filters.thematicAreaId) params.append('thematicAreaId', filters.thematicAreaId);
+                if (filters.regionId && filters.regionId !== '') params.append('regionId', filters.regionId);
+                if (filters.districtId && filters.districtId !== '') params.append('districtId', filters.districtId);
+                if (filters.assessmentTypeId && filters.assessmentTypeId !== '') params.append('assessmentTypeId', filters.assessmentTypeId);
+                if (filters.thematicAreaId && filters.thematicAreaId !== '') params.append('thematicAreaId', filters.thematicAreaId);
                 if (params.toString()) url += '?' + params.toString();
 
                 const resp = await fetch(url, {headers: getAuthHeaders()});
@@ -319,7 +335,38 @@
             }
         }
 
-        loadFilters();
+        loadFilters().then(() => {
+            // Apply restrictions after filters are loaded (only for non-admin users)
+            setTimeout(async () => {
+                if (typeof window.applyAdminRestrictions === 'function') {
+                    // Check admin status first before applying restrictions
+                    try {
+                        const token = localStorage.getItem('token');
+                        const headers = {};
+                        if (token) {
+                            headers['Authorization'] = `Bearer ${token}`;
+                        }
+                        const response = await fetch('/api/user/admin-areas', { headers });
+                        if (response.ok) {
+                            const data = await response.json();
+                            const isAdmin = data.isAdmin === true || data.isAdmin === 1 || data.isAdmin === "true";
+                            if (!isAdmin) {
+                                // Only apply restrictions if user is not admin
+                                // Reset the flag so restrictions can be reapplied
+                                if (window.restrictionsApplied !== undefined) {
+                                    window.restrictionsApplied = false;
+                                }
+                                window.applyAdminRestrictions();
+                            } else {
+                                console.log('Admin user detected - skipping restrictions');
+                            }
+                        }
+                    } catch (e) {
+                        console.error('Error checking admin status:', e);
+                    }
+                }
+            }, 300);
+        });
         loadDashboard();
 
         function getAssessmentPercentage(assessment) {

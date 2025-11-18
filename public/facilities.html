@@ -1074,8 +1074,7 @@
                 return;
             }
             try {
-                const params = new URLSearchParams({ subcountyId });
-                const response = await fetch(`${API_BASE}/facilities?${params.toString()}`, { headers: getAuthHeaders(null) });
+                const response = await fetch(`${API_BASE}/facilities/${subcountyId}`, { headers: getAuthHeaders(null) });
                 if (!response.ok) throw new Error('Failed to load facilities');
                 const facilities = await response.json();
                 if (!Array.isArray(facilities) || facilities.length === 0) {

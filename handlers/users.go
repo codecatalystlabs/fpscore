@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"database/sql"
+	"fmt"
 	"strconv"
 
 	"fpscore/database"
@@ -139,6 +140,13 @@ func CreateUser(c *fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusBadRequest, "Invalid request body")
 	}
 
+	// Debug logging
+	fmt.Printf("DEBUG: CreateUser - AdminAreas count: %d\n", len(req.AdminAreas))
+	for i, area := range req.AdminAreas {
+		fmt.Printf("DEBUG: AdminArea[%d] - RegionID: %v, DistrictID: %v, SubcountyID: %v, FacilityID: %v\n",
+			i, area.RegionID, area.DistrictID, area.SubcountyID, area.FacilityID)
+	}
+
 	// Hash password
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
@@ -167,12 +175,23 @@ func CreateUser(c *fiber.Ctx) error {
 	}
 
 	// Add admin areas
+	adminAreasInserted := 0
 	for _, area := range req.AdminAreas {
-		tx.Exec(`
-			INSERT INTO user_admin_areas (user_id, region_id, district_id, subcounty_id, facility_id) 
-			VALUES ($1, $2, $3, $4, $5)
-		`, userID, area.RegionID, area.DistrictID, area.SubcountyID, area.FacilityID)
+		// Only insert if at least one admin area is specified
+		if area.RegionID != nil || area.DistrictID != nil || area.SubcountyID != nil || area.FacilityID != nil {
+			result, err := tx.Exec(`
+				INSERT INTO user_admin_areas (user_id, region_id, district_id, subcounty_id, facility_id) 
+				VALUES ($1, $2, $3, $4, $5)
+			`, userID, area.RegionID, area.DistrictID, area.SubcountyID, area.FacilityID)
+			if err != nil {
+				return fmt.Errorf("failed to insert admin area: %w", err)
+			}
+			rowsAffected, _ := result.RowsAffected()
+			fmt.Printf("DEBUG: Inserted admin area for user %d, rows affected: %d\n", userID, rowsAffected)
+			adminAreasInserted++
+		}
 	}
+	fmt.Printf("DEBUG: Total admin areas inserted for user %d: %d\n", userID, adminAreasInserted)
 
 	if err = tx.Commit(); err != nil {
 		return err
@@ -192,6 +211,13 @@ func UpdateUser(c *fiber.Ctx) error {
 	var req CreateUserRequest
 	if err := c.BodyParser(&req); err != nil {
 		return fiber.NewError(fiber.StatusBadRequest, "Invalid request body")
+	}
+
+	// Debug logging
+	fmt.Printf("DEBUG: UpdateUser (ID: %d) - AdminAreas count: %d\n", userID, len(req.AdminAreas))
+	for i, area := range req.AdminAreas {
+		fmt.Printf("DEBUG: AdminArea[%d] - RegionID: %v, DistrictID: %v, SubcountyID: %v, FacilityID: %v\n",
+			i, area.RegionID, area.DistrictID, area.SubcountyID, area.FacilityID)
 	}
 
 	tx, err := database.DB.Begin()
@@ -230,13 +256,28 @@ func UpdateUser(c *fiber.Ctx) error {
 	}
 
 	// Update admin areas
-	tx.Exec(`DELETE FROM user_admin_areas WHERE user_id=$1`, userID)
-	for _, area := range req.AdminAreas {
-		tx.Exec(`
-			INSERT INTO user_admin_areas (user_id, region_id, district_id, subcounty_id, facility_id) 
-			VALUES ($1, $2, $3, $4, $5)
-		`, userID, area.RegionID, area.DistrictID, area.SubcountyID, area.FacilityID)
+	_, err = tx.Exec(`DELETE FROM user_admin_areas WHERE user_id=$1`, userID)
+	if err != nil {
+		return fmt.Errorf("failed to delete existing admin areas: %w", err)
 	}
+
+	adminAreasInserted := 0
+	for _, area := range req.AdminAreas {
+		// Only insert if at least one admin area is specified
+		if area.RegionID != nil || area.DistrictID != nil || area.SubcountyID != nil || area.FacilityID != nil {
+			result, err := tx.Exec(`
+				INSERT INTO user_admin_areas (user_id, region_id, district_id, subcounty_id, facility_id) 
+				VALUES ($1, $2, $3, $4, $5)
+			`, userID, area.RegionID, area.DistrictID, area.SubcountyID, area.FacilityID)
+			if err != nil {
+				return fmt.Errorf("failed to insert admin area: %w", err)
+			}
+			rowsAffected, _ := result.RowsAffected()
+			fmt.Printf("DEBUG: Inserted admin area for user %d, rows affected: %d\n", userID, rowsAffected)
+			adminAreasInserted++
+		}
+	}
+	fmt.Printf("DEBUG: Total admin areas inserted for user %d: %d\n", userID, adminAreasInserted)
 
 	if err = tx.Commit(); err != nil {
 		return err
