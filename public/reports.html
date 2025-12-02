@@ -65,9 +65,16 @@
                                 </select>
                             </div>
                         </div>
-                        <div class="mt-3">
-                            <button class="btn btn-outline-primary me-2" onclick="exportPDF()"><i class="bi bi-filetype-pdf"></i> Export PDF</button>
-                            <button class="btn btn-outline-success" onclick="exportXLS()"><i class="bi bi-file-earmark-spreadsheet"></i> Export Excel</button>
+                        <div class="mt-3 d-flex align-items-center">
+                            <button class="btn btn-outline-primary me-2" onclick="exportPDF()">
+                                <i class="bi bi-filetype-pdf"></i> Export PDF
+                            </button>
+                            <button class="btn btn-outline-success me-3" onclick="exportXLS()">
+                                <i class="bi bi-file-earmark-spreadsheet"></i> Export Excel
+                            </button>
+                            <button class="btn btn-sm btn-outline-secondary" type="button" onclick="clearReportFilters()">
+                                <i class="bi bi-x-circle"></i> Clear Filters
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -91,6 +98,39 @@
             return { 'Authorization': 'Bearer ' + localStorage.getItem('token') };
         }
         function logout() { localStorage.clear(); window.location.href = '/'; }
+
+        // Clear all report filters back to "All ..."
+        function clearReportFilters() {
+            const regionSelect = document.getElementById('filterRegion');
+            const districtSelect = document.getElementById('filterDistrict');
+            const facilitySelect = document.getElementById('filterFacility');
+            const healthWorkerSelect = document.getElementById('filterHealthWorker');
+            const typeSelect = document.getElementById('filterAssessmentType');
+            const thematicSelect = document.getElementById('filterThematicArea');
+
+            if (regionSelect) {
+                regionSelect.value = '';
+            }
+            if (districtSelect) {
+                districtSelect.innerHTML = '<option value=\"\">All Districts</option>';
+                districtSelect.disabled = true;
+            }
+            if (facilitySelect) {
+                facilitySelect.innerHTML = '<option value=\"\">All Facilities</option>';
+                facilitySelect.disabled = true;
+            }
+            if (healthWorkerSelect) {
+                healthWorkerSelect.innerHTML = '<option value=\"\">All Health Workers</option>';
+                healthWorkerSelect.disabled = true;
+            }
+            if (typeSelect) {
+                typeSelect.value = '';
+            }
+            if (thematicSelect) {
+                thematicSelect.innerHTML = '<option value=\"\">All Areas</option>';
+                thematicSelect.disabled = true;
+            }
+        }
 
         async function loadFilters() {
             const [regions, types] = await Promise.all([
