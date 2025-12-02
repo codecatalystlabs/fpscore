@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Health Worker Performance - Family Planning Score Tool</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body {
+            background: #f5f7fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .header-section {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem 0;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .report-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            padding: 2rem;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+        }
+        .report-header {
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        .report-title {
+            color: #667eea;
+            font-weight: 700;
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+        .report-meta {
+            color: #6c757d;
+            font-size: 0.9rem;
+        }
+        .score-card {
+            border-radius: 12px;
+            padding: 2rem;
+            margin-bottom: 1.5rem;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        .score-proficient {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+        }
+        .score-competent {
+            background: linear-gradient(135deg, #ffc107 0%, #fd7e14 100%);
+            color: #000;
+        }
+        .score-not-acceptable {
+            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+            color: white;
+        }
+        .thematic-score {
+            margin-bottom: 0;
+            padding: 1.5rem;
+            background: white;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 2px solid #e9ecef;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            height: 100%;
+        }
+        .thematic-score:hover {
+            transform: translateY(-5px);
+            border-color: #667eea;
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.2);
+        }
+        .thematic-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 1.5rem;
+        }
+        .question-item {
+            padding: 1rem 1.25rem;
+            margin-bottom: 0.75rem;
+            background: white;
+            border-left: 4px solid #dee2e6;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+            transition: all 0.2s ease;
+        }
+        .question-item:hover {
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+            transform: translateY(-2px);
+        }
+        .question-item.yes {
+            border-left-color: #28a745;
+            background: linear-gradient(to right, #f8fff9 0%, #ffffff 100%);
+        }
+        .question-item.no {
+            border-left-color: #dc3545;
+            background: linear-gradient(to right, #fff8f8 0%, #ffffff 100%);
+        }
+        .question-item.na {
+            border-left-color: #6c757d;
+            background: linear-gradient(to right, #f8f9fa 0%, #ffffff 100%);
+        }
+        .response-badge {
+            display: inline-block;
+            padding: 0.35rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+        }
+        .response-badge.yes {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .response-badge.no {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .response-badge.na {
+            background-color: #e2e3e5;
+            color: #383d41;
+            border: 1px solid #d6d8db;
+        }
+        .modal-xl {
+            max-width: 1200px;
+        }
+        .performance-metric {
+            text-align: center;
+            padding: 1rem;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            margin: 0.5rem;
+        }
+        .performance-metric h3 {
+            margin: 0;
+            font-size: 2rem;
+            font-weight: 700;
+        }
+        .performance-metric small {
+            display: block;
+            margin-top: 0.5rem;
+            opacity: 0.9;
+            font-size: 0.9rem;
+        }
+        .section-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1rem 1.5rem;
+            border-radius: 10px 10px 0 0;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .section-header.bg-success {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        }
+        .section-header.bg-danger {
+            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+        }
+        .section-header.bg-secondary {
+            background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%);
+        }
+        .card {
+            border: none;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            margin-bottom: 1.5rem;
+            overflow: hidden;
+        }
+        .card-body {
+            padding: 1.5rem;
+        }
+        .response-item {
+            padding: 0.75rem 1rem;
+            margin-bottom: 0.5rem;
+            background: #f8f9fa;
+            border-radius: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background-color 0.2s;
+        }
+        .response-item:hover {
+            background: #e9ecef;
+        }
+        .question-text {
+            font-size: 0.95rem;
+            line-height: 1.6;
+            color: #212529;
+        }
+        .badge {
+            font-size: 0.7rem;
+            padding: 0.35rem 0.6rem;
+            font-weight: 600;
+        }
+        .info-item {
+            padding: 0.75rem;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 3px solid #667eea;
+        }
+        .modal-body::-webkit-scrollbar {
+            width: 8px;
+        }
+        .modal-body::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        .modal-body::-webkit-scrollbar-thumb {
+            background: #667eea;
+            border-radius: 10px;
+        }
+        .modal-body::-webkit-scrollbar-thumb:hover {
+            background: #5568d3;
+        }
+    </style>
+</head>
+<body>
+    <div class="header-section">
+        <div class="container-fluid">
+            <div class="d-flex justify-content-between align-items-center">
+                <h1 class="mb-0">
+                    <i class="bi bi-graph-up"></i> Health Worker Performance
+                </h1>
+                <a href="home.html" class="btn btn-light">
+                    <i class="bi bi-arrow-left"></i> Back to Home
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="container-fluid">
+        <div class="report-container">
+            <!-- Report Header -->
+            <div class="report-header">
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <div>
+                        <h1 class="report-title">
+                            <i class="bi bi-file-earmark-text"></i> Health Worker Performance Report
+                        </h1>
+                        <p class="report-meta mb-0">
+                            Generated on <span id="reportDate"></span>
+                        </p>
+                    </div>
+                    <a href="home.html" class="btn btn-outline-light" style="border-radius: 8px;">
+                        <i class="bi bi-arrow-left"></i> Back
+                    </a>
+                </div>
+            </div>
+
+            <!-- Date Range Filter -->
+            <div class="card mb-4" style="border: 1px solid #dee2e6; border-radius: 10px;">
+                <div class="card-body p-3">
+                    <div class="row g-2 align-items-end">
+                        <div class="col-md-3">
+                            <label class="form-label small fw-semibold mb-1">Start Date</label>
+                            <input type="date" class="form-control" id="startDate">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small fw-semibold mb-1">End Date</label>
+                            <input type="date" class="form-control" id="endDate">
+                        </div>
+                        <div class="col-md-6 d-flex gap-2">
+                            <button class="btn btn-primary" id="filterBtn" style="border-radius: 6px;">
+                                <i class="bi bi-funnel"></i> Apply Filter
+                            </button>
+                            <button class="btn btn-outline-secondary" id="clearBtn" style="border-radius: 6px;">
+                                <i class="bi bi-x-circle"></i> Clear
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Health Worker Information Section -->
+            <div class="card mb-4" style="border: 1px solid #dee2e6; border-radius: 10px;">
+                <div class="card-header bg-light" style="border-bottom: 2px solid #dee2e6; border-radius: 10px 10px 0 0;">
+                    <h5 class="mb-0" style="color: #495057; font-weight: 600;">
+                        <i class="bi bi-person-badge"></i> Health Worker Information
+                    </h5>
+                </div>
+                <div class="card-body p-4">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <table class="table table-sm table-borderless mb-0">
+                                <tr>
+                                    <td class="text-muted" style="width: 40%;"><strong>Name:</strong></td>
+                                    <td id="healthWorkerName">Loading...</td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted"><strong>Facility:</strong></td>
+                                    <td id="facilityName">-</td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted"><strong>Region:</strong></td>
+                                    <td id="regionName">-</td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div class="col-md-4">
+                            <table class="table table-sm table-borderless mb-0">
+                                <tr>
+                                    <td class="text-muted" style="width: 40%;"><strong>District:</strong></td>
+                                    <td id="districtName">-</td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted"><strong>Subcounty:</strong></td>
+                                    <td id="subcountyName">-</td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted"><strong>Email:</strong></td>
+                                    <td id="email">-</td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted"><strong>Phone:</strong></td>
+                                    <td id="phoneNumber">-</td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="text-center" style="padding: 1.5rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 10px; color: white; height: 100%; display: flex; flex-direction: column; justify-content: center;">
+                                <h6 class="mb-3" style="opacity: 0.9; font-weight: 600;">Overall Average Score</h6>
+                                <h1 class="display-4 mb-2" id="averageScore" style="font-weight: 700; margin: 0;">0.0%</h1>
+                                <p id="assessedCount" style="opacity: 0.9; font-size: 0.9rem; margin: 0;">Based on 0 thematic areas assessed</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Thematic Area Performance Section -->
+            <div class="card mb-4" style="border: 1px solid #dee2e6; border-radius: 10px;">
+                <div class="card-header bg-light" style="border-bottom: 2px solid #dee2e6; border-radius: 10px 10px 0 0;">
+                    <h5 class="mb-0" style="color: #495057; font-weight: 600;">
+                        <i class="bi bi-list-check"></i> Performance by Thematic Area
+                    </h5>
+                    <small class="text-muted">Click on a card to view detailed questions and responses</small>
+                </div>
+                <div class="card-body p-4">
+                    <div class="thematic-grid" id="thematicScoresContainer">
+                        <div class="text-center py-5 w-100">
+                            <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-3 text-muted">Loading thematic areas...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Thematic Area Details Modal -->
+    <div class="modal fade" id="thematicAreaModal" tabindex="-1">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content" style="border-radius: 15px; border: none; box-shadow: 0 10px 40px rgba(0,0,0,0.2);">
+                <div class="modal-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 15px 15px 0 0; padding: 1.5rem;">
+                    <h5 class="modal-title" id="thematicAreaModalTitle" style="font-weight: 600; font-size: 1.25rem;">
+                        <i class="bi bi-clipboard-data"></i> Thematic Area Details
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" style="filter: brightness(0) invert(1);"></button>
+                </div>
+                <div class="modal-body" style="padding: 2rem; max-height: 80vh; overflow-y: auto;">
+                    <div id="thematicAreaDetailsContent">
+                        <div class="text-center py-5">
+                            <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-3 text-muted">Loading performance data...</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer" style="border-top: 1px solid #e9ecef; padding: 1rem 2rem; border-radius: 0 0 15px 15px;">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" style="border-radius: 8px; padding: 0.5rem 1.5rem;">
+                        <i class="bi bi-x-lg"></i> Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="health-worker-performance.js"></script>
+</body>
+</html>
+

@@ -20,6 +20,22 @@ document.addEventListener('DOMContentLoaded', function() {
     loadAssessmentTypes();
     setupCascadingDropdowns();
     loadAssessments();
+    
+    // Add filter button handlers
+    const filterBtn = document.getElementById('filterAssessments');
+    const clearBtn = document.getElementById('clearFilters');
+    if (filterBtn) {
+        filterBtn.addEventListener('click', loadAssessments);
+    }
+    if (clearBtn) {
+        clearBtn.addEventListener('click', function() {
+            const startDate = document.getElementById('startDate');
+            const endDate = document.getElementById('endDate');
+            if (startDate) startDate.value = '';
+            if (endDate) endDate.value = '';
+            loadAssessments();
+        });
+    }
 });
 
 // Load regions
@@ -45,7 +61,7 @@ async function loadRegions() {
         // Check if this dropdown is restricted - if so, don't clear it
         const isRestricted = select.disabled && select.classList.contains('bg-light');
         if (!isRestricted) {
-            select.innerHTML = '<option value="">Select Region</option>';
+            select.innerHTML = '<option value="">All Regions</option>';
             regions.forEach(region => {
                 const option = document.createElement('option');
                 option.value = region.id;
@@ -69,48 +85,44 @@ async function loadRegions() {
     }
 }
 
-// Setup cascading dropdowns
+// Global variables for health worker selection
+let allHealthWorkers = []; // Store all loaded health workers for filtering
+let selectedHealthWorker = null;
+
+// Setup cascading dropdowns and health worker selection
 function setupCascadingDropdowns() {
     const regionSelect = document.getElementById('regionSelect');
     const districtSelect = document.getElementById('districtSelect');
     const subcountySelect = document.getElementById('subcountySelect');
     const facilitySelect = document.getElementById('facilitySelect');
+    const healthWorkerSelect = document.getElementById('healthWorkerSelect');
+    const healthWorkerSearch = document.getElementById('healthWorkerSearch');
+    const healthWorkerDropdown = document.getElementById('healthWorkerDropdown');
+
+    if (!regionSelect || !districtSelect || !facilitySelect || !healthWorkerSelect) {
+        return; // Elements don't exist on this page
+    }
 
     regionSelect.addEventListener('change', async function() {
         const regionId = this.value;
         if (regionId) {
-            // Only enable if not already disabled by restrictions
-            if (!districtSelect.classList.contains('bg-light')) {
-                districtSelect.disabled = false;
-            }
+            districtSelect.disabled = false;
             districtSelect.innerHTML = '<option value="">Loading...</option>';
-            // Only disable if not restricted (restricted dropdowns should stay disabled)
-            if (!subcountySelect.classList.contains('bg-light')) {
+            if (subcountySelect) {
                 subcountySelect.disabled = true;
+                subcountySelect.innerHTML = '<option value="">All Subcounties</option>';
             }
-            subcountySelect.innerHTML = '<option value="">Select Subcounty</option>';
-            if (!facilitySelect.classList.contains('bg-light')) {
-                facilitySelect.disabled = true;
-            }
-            facilitySelect.innerHTML = '<option value="">Select Facility</option>';
+            facilitySelect.disabled = true;
+            facilitySelect.innerHTML = '<option value="">All Facilities</option>';
+            clearHealthWorkerSelection();
             
             try {
-                const token = localStorage.getItem('token');
-                const headers = {};
-                if (token) {
-                    headers['Authorization'] = `Bearer ${token}`;
-                }
-                const response = await fetch(`${API_BASE}/districts/${regionId}`, { headers });
+                const response = await fetch(`${API_BASE}/districts/${regionId}`, { headers: getAuthHeaders(null) });
                 if (!response.ok) {
-                    if (response.status === 403) {
-                        console.error('Permission denied');
-                        districtSelect.innerHTML = '<option value="">Permission denied</option>';
-                        return;
-                    }
                     throw new Error('Failed to load districts');
                 }
                 const districts = await response.json();
-                districtSelect.innerHTML = '<option value="">Select District</option>';
+                districtSelect.innerHTML = '<option value="">All Districts</option>';
                 districts.forEach(district => {
                     const option = document.createElement('option');
                     option.value = district.id;
@@ -122,114 +134,233 @@ function setupCascadingDropdowns() {
             }
         } else {
             districtSelect.disabled = true;
-            districtSelect.innerHTML = '<option value="">Select District</option>';
+            districtSelect.innerHTML = '<option value="">All Districts</option>';
+            if (subcountySelect) {
+                subcountySelect.disabled = true;
+                subcountySelect.innerHTML = '<option value="">All Subcounties</option>';
+            }
+            facilitySelect.disabled = true;
+            facilitySelect.innerHTML = '<option value="">All Facilities</option>';
+            clearHealthWorkerSelection();
         }
+        loadHealthWorkers();
     });
 
     districtSelect.addEventListener('change', async function() {
         const districtId = this.value;
         if (districtId) {
-            // Only enable if not already disabled by restrictions
-            if (!subcountySelect.classList.contains('bg-light')) {
+            if (subcountySelect) {
                 subcountySelect.disabled = false;
+                subcountySelect.innerHTML = '<option value="">Loading...</option>';
             }
-            subcountySelect.innerHTML = '<option value="">Loading...</option>';
             facilitySelect.disabled = true;
-            facilitySelect.innerHTML = '<option value="">Select Facility</option>';
+            facilitySelect.innerHTML = '<option value="">All Facilities</option>';
+            clearHealthWorkerSelection();
             
             try {
-                const token = localStorage.getItem('token');
-                const headers = {};
-                if (token) {
-                    headers['Authorization'] = `Bearer ${token}`;
-                }
-                const response = await fetch(`${API_BASE}/subcounties/${districtId}`, { headers });
+                const response = await fetch(`${API_BASE}/subcounties/${districtId}`, { headers: getAuthHeaders(null) });
                 if (!response.ok) {
-                    if (response.status === 403) {
-                        console.error('Permission denied');
-                        subcountySelect.innerHTML = '<option value="">Permission denied</option>';
-                        return;
-                    }
                     throw new Error('Failed to load subcounties');
                 }
                 const subcounties = await response.json();
-                subcountySelect.innerHTML = '<option value="">Select Subcounty</option>';
-                subcounties.forEach(subcounty => {
-                    const option = document.createElement('option');
-                    option.value = subcounty.id;
-                    option.textContent = subcounty.name;
-                    subcountySelect.appendChild(option);
-                });
+                if (subcountySelect) {
+                    subcountySelect.innerHTML = '<option value="">All Subcounties</option>';
+                    subcounties.forEach(subcounty => {
+                        const option = document.createElement('option');
+                        option.value = subcounty.id;
+                        option.textContent = subcounty.name;
+                        subcountySelect.appendChild(option);
+                    });
+                }
             } catch (error) {
                 console.error('Error loading subcounties:', error);
+                if (subcountySelect) {
+                    subcountySelect.innerHTML = '<option value="">Error loading subcounties</option>';
+                }
             }
         } else {
-            // Only disable if not restricted (restricted dropdowns should stay disabled)
-            if (!subcountySelect.classList.contains('bg-light')) {
+            if (subcountySelect) {
                 subcountySelect.disabled = true;
+                subcountySelect.innerHTML = '<option value="">All Subcounties</option>';
             }
-            subcountySelect.innerHTML = '<option value="">Select Subcounty</option>';
+            facilitySelect.disabled = true;
+            facilitySelect.innerHTML = '<option value="">All Facilities</option>';
+            clearHealthWorkerSelection();
         }
+        loadHealthWorkers();
     });
 
-    subcountySelect.addEventListener('change', async function() {
-        const subcountyId = this.value;
-        if (subcountyId) {
-            // Only enable if not already disabled by restrictions
-            if (!facilitySelect.classList.contains('bg-light')) {
+    if (subcountySelect) {
+        subcountySelect.addEventListener('change', async function() {
+            const subcountyId = this.value;
+            if (subcountyId) {
                 facilitySelect.disabled = false;
+                facilitySelect.innerHTML = '<option value="">Loading...</option>';
+                clearHealthWorkerSelection();
+                
+                try {
+                    const response = await fetch(`${API_BASE}/facilities/${subcountyId}`, { headers: getAuthHeaders(null) });
+                    if (!response.ok) {
+                        throw new Error('Failed to load facilities');
+                    }
+                    const facilities = await response.json();
+                    facilitySelect.innerHTML = '<option value="">All Facilities</option>';
+                    facilities.forEach(facility => {
+                        const option = document.createElement('option');
+                        option.value = facility.id;
+                        option.textContent = facility.name;
+                        facilitySelect.appendChild(option);
+                    });
+                } catch (error) {
+                    console.error('Error loading facilities:', error);
+                    facilitySelect.innerHTML = '<option value="">Error loading facilities</option>';
+                }
+            } else {
+                facilitySelect.disabled = true;
+                facilitySelect.innerHTML = '<option value="">All Facilities</option>';
+                clearHealthWorkerSelection();
             }
-            facilitySelect.innerHTML = '<option value="">Loading...</option>';
-            
-            try {
-                const response = await fetch(`${API_BASE}/facilities/${subcountyId}`, { headers: getAuthHeaders(null) });
-                if (!response.ok) {
-                    if (response.status === 403) {
-                        facilitySelect.innerHTML = '<option value="">Permission denied</option>';
-                        return;
-                    }
-                    if (response.status === 401) {
-                        facilitySelect.innerHTML = '<option value="">Unauthorized - please login again</option>';
-                        console.error('Unauthorized: Token may be expired');
-                        return;
-                    }
-                    let errorMsg = 'Failed to load facilities';
-                    try {
-                        const errorData = await response.json();
-                        errorMsg = errorData.error || errorMsg;
-                    } catch (e) {
-                        errorMsg = `Failed to load facilities (${response.status})`;
-                    }
-                    facilitySelect.innerHTML = `<option value="">Error: ${errorMsg}</option>`;
-                    console.error('Error loading facilities:', errorMsg);
-                    return;
-                }
-                const facilities = await response.json();
-                if (!Array.isArray(facilities)) {
-                    console.error('Invalid response format:', facilities);
-                    facilitySelect.innerHTML = '<option value="">Error: Invalid response</option>';
-                    return;
-                }
-                facilitySelect.innerHTML = '<option value="">Select Facility</option>';
-                if (facilities.length === 0) {
-                    facilitySelect.innerHTML = '<option value="">No facilities found</option>';
-                    return;
-                }
-                facilities.forEach(facility => {
-                    const option = document.createElement('option');
-                    option.value = facility.id;
-                    option.textContent = facility.name;
-                    facilitySelect.appendChild(option);
-                });
-            } catch (error) {
-                console.error('Error loading facilities:', error);
-                facilitySelect.innerHTML = `<option value="">Error: ${error.message || 'Unknown error'}</option>`;
-            }
-        } else {
-            facilitySelect.disabled = true;
-            facilitySelect.innerHTML = '<option value="">Select Facility</option>';
-        }
+            loadHealthWorkers();
+        });
+    }
+
+    facilitySelect.addEventListener('change', function() {
+        loadHealthWorkers();
     });
+
+    // Clear health worker selection
+    function clearHealthWorkerSelection() {
+        allHealthWorkers = [];
+        selectedHealthWorker = null;
+        if (healthWorkerSearch) {
+            healthWorkerSearch.value = '';
+        }
+        if (healthWorkerDropdown) {
+            healthWorkerDropdown.innerHTML = '';
+            healthWorkerDropdown.classList.remove('show');
+        }
+    }
+
+    // Filter health workers based on search input
+    function filterHealthWorkers() {
+        if (!healthWorkerDropdown || !healthWorkerSearch) return;
+        
+        const searchTerm = healthWorkerSearch.value.toLowerCase().trim();
+        
+        if (searchTerm.length === 0) {
+            healthWorkerDropdown.classList.remove('show');
+            return;
+        }
+        
+        const filtered = allHealthWorkers.filter(hw => {
+            const name = hw.fullName.toLowerCase();
+            const email = hw.email ? hw.email.toLowerCase() : '';
+            const phone = hw.phoneNumber ? hw.phoneNumber.toLowerCase() : '';
+            const facility = hw.facilityName ? hw.facilityName.toLowerCase() : '';
+            return name.includes(searchTerm) || email.includes(searchTerm) || phone.includes(searchTerm) || facility.includes(searchTerm);
+        });
+        
+        if (filtered.length === 0) {
+            healthWorkerDropdown.innerHTML = '<div class="health-worker-option text-muted p-2">No health workers found</div>';
+            healthWorkerDropdown.classList.add('show');
+            return;
+        }
+        
+        healthWorkerDropdown.innerHTML = '';
+        filtered.forEach(hw => {
+            const option = document.createElement('div');
+            option.className = 'health-worker-option';
+            const displayName = hw.fullName + (hw.email ? ` (${hw.email})` : '') + (hw.phoneNumber ? ` - ${hw.phoneNumber}` : '') + ` - ${hw.facilityName}`;
+            option.textContent = displayName;
+            option.dataset.hwId = hw.id;
+            option.dataset.facilityId = hw.facilityId;
+            option.dataset.facilityName = hw.facilityName;
+            option.addEventListener('click', function() {
+                selectedHealthWorker = {
+                    id: hw.id,
+                    fullName: hw.fullName,
+                    email: hw.email,
+                    phoneNumber: hw.phoneNumber,
+                    facilityId: hw.facilityId,
+                    facilityName: hw.facilityName
+                };
+                healthWorkerSearch.value = hw.fullName;
+                healthWorkerDropdown.classList.remove('show');
+            });
+            healthWorkerDropdown.appendChild(option);
+        });
+        healthWorkerDropdown.classList.add('show');
+    }
+
+    // Load health workers based on filters
+    async function loadHealthWorkers() {
+        if (!healthWorkerSelect) return;
+        
+        const params = new URLSearchParams();
+        const regionId = regionSelect.value;
+        const districtId = districtSelect.value;
+        const subcountyId = subcountySelect ? subcountySelect.value : '';
+        const facilityId = facilitySelect.value;
+        
+        if (regionId) params.append('regionId', regionId);
+        if (districtId) params.append('districtId', districtId);
+        if (subcountyId) params.append('subcountyId', subcountyId);
+        if (facilityId) params.append('facilityId', facilityId);
+        
+        try {
+            const response = await fetch(`${API_BASE}/health-workers?${params.toString()}`, { headers: getAuthHeaders(null) });
+            if (!response.ok) {
+                throw new Error('Failed to load health workers');
+            }
+            const healthWorkers = await response.json();
+            
+            // Store health workers with all needed properties
+            allHealthWorkers = healthWorkers.map(hw => ({
+                id: hw.id,
+                fullName: hw.fullName,
+                email: hw.email || '',
+                phoneNumber: hw.phoneNumber || '',
+                facilityId: hw.facilityId,
+                facilityName: hw.facilityName
+            }));
+            
+            // If there's a search term, filter immediately
+            if (healthWorkerSearch && healthWorkerSearch.value.trim()) {
+                filterHealthWorkers();
+            }
+        } catch (error) {
+            console.error('Error loading health workers:', error);
+        }
+    }
+
+    // Search input handlers
+    if (healthWorkerSearch) {
+        let searchTimeout;
+        healthWorkerSearch.addEventListener('input', function() {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                filterHealthWorkers();
+            }, 200);
+        });
+        
+        healthWorkerSearch.addEventListener('focus', function() {
+            if (this.value.trim() && allHealthWorkers.length > 0) {
+                filterHealthWorkers();
+            }
+        });
+        
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function(e) {
+            if (healthWorkerDropdown && healthWorkerSearch && 
+                !healthWorkerDropdown.contains(e.target) && 
+                !healthWorkerSearch.contains(e.target)) {
+                healthWorkerDropdown.classList.remove('show');
+            }
+        });
+    }
+
+    // Initial load of health workers
+    loadHealthWorkers();
 }
 
 // Load assessment types
@@ -276,15 +407,18 @@ async function loadAssessmentTypes() {
         // Add click handlers
         container.querySelectorAll('.assessment-type-card').forEach(card => {
             card.addEventListener('click', function() {
-                const facilityId = document.getElementById('facilitySelect').value;
-                if (!facilityId) {
-                    alert('Please select a facility first');
+                // Get selected health worker from the search/selection
+                if (!selectedHealthWorker) {
+                    alert('Please select a health worker first');
                     return;
                 }
+                
+                const healthWorkerId = selectedHealthWorker.id;
+                const facilityId = selectedHealthWorker.facilityId;
+                const facilityName = selectedHealthWorker.facilityName;
                 const typeId = this.dataset.typeId;
                 const typeCode = this.dataset.typeCode;
-                const facilityName = document.getElementById('facilitySelect').selectedOptions[0].textContent;
-                window.location.href = `assessment.html?typeId=${typeId}&facilityId=${facilityId}&facilityName=${encodeURIComponent(facilityName)}&typeCode=${typeCode}`;
+                window.location.href = `assessment.html?typeId=${typeId}&healthWorkerId=${healthWorkerId}&facilityId=${facilityId}&facilityName=${encodeURIComponent(facilityName)}&typeCode=${typeCode}`;
             });
         });
     } catch (error) {
@@ -292,7 +426,7 @@ async function loadAssessmentTypes() {
     }
 }
 
-// Load assessments for history
+// Load health workers with assessments for history
 async function loadAssessments() {
     const container = document.getElementById('assessmentsList');
     if (!container) {
@@ -306,73 +440,85 @@ async function loadAssessments() {
         if (token) {
             headers['Authorization'] = `Bearer ${token}`;
         }
-        const response = await fetch(`${API_BASE}/assessments`, { headers });
+
+        // Get date range filters
+        const startDate = document.getElementById('startDate') ? document.getElementById('startDate').value : '';
+        const endDate = document.getElementById('endDate') ? document.getElementById('endDate').value : '';
+
+        const params = new URLSearchParams();
+        if (startDate) params.append('startDate', startDate);
+        if (endDate) params.append('endDate', endDate);
+
+        const response = await fetch(`${API_BASE}/health-workers-with-assessments?${params.toString()}`, { headers });
         if (!response.ok) {
             if (response.status === 403) {
-                console.error('Permission denied: You do not have permission to view assessments');
-                container.innerHTML = '<div class="alert alert-warning">You do not have permission to view assessments. Please contact your administrator.</div>';
+                console.error('Permission denied: You do not have permission to view health workers');
+                container.innerHTML = '<div class="alert alert-warning">You do not have permission to view health workers. Please contact your administrator.</div>';
                 return;
             }
             // Try to get error message from response
-            let errorMsg = 'Failed to load assessments';
+            let errorMsg = 'Failed to load health workers';
             try {
                 const errorData = await response.json();
                 errorMsg = errorData.error || errorMsg;
             } catch (e) {
-                errorMsg = `Failed to load assessments (${response.status})`;
+                errorMsg = `Failed to load health workers (${response.status})`;
             }
             container.innerHTML = `<div class="alert alert-danger">${errorMsg}</div>`;
             return;
         }
-        const assessments = await response.json();
+        const healthWorkers = await response.json();
         
-        if (assessments.length === 0) {
-            container.innerHTML = '<p class="text-center text-muted">No assessments found.</p>';
+        if (healthWorkers.length === 0) {
+            container.innerHTML = '<p class="text-center text-muted">No health workers with assessments found.</p>';
             return;
         }
 
-        container.innerHTML = '<div class="table-responsive"><table class="table table-hover"><thead><tr><th>Date</th><th>Facility</th><th>Type</th><th>Score</th><th>Level</th><th>Actions</th></tr></thead><tbody></tbody></table></div>';
+        container.innerHTML = '<div class="table-responsive"><table class="table table-hover"><thead><tr><th>Health Worker</th><th>Email</th><th>Phone</th><th>Facility</th><th>Region</th><th>District</th><th>Subcounty</th><th>Assessments</th><th>First Assessment</th><th>Last Assessment</th><th>Actions</th></tr></thead><tbody></tbody></table></div>';
         const tbody = container.querySelector('tbody');
 
-        assessments.forEach(assessment => {
+        healthWorkers.forEach(hw => {
             const row = document.createElement('tr');
-            // Handle both percentage and percentageScore fields
-            const percentage = assessment.percentage !== undefined 
-                ? parseFloat(assessment.percentage).toFixed(1)
-                : (assessment.percentageScore !== undefined 
-                    ? parseFloat(assessment.percentageScore).toFixed(1) 
-                    : '0.0');
-            const levelClass = assessment.performanceLevel === 'Proficient' ? 'success' :
-                              assessment.performanceLevel === 'Competent' ? 'warning' : 'danger';
+            const firstDate = hw.firstAssessment ? new Date(hw.firstAssessment).toLocaleDateString() : 'N/A';
+            const lastDate = hw.lastAssessment ? new Date(hw.lastAssessment).toLocaleDateString() : 'N/A';
             
             row.innerHTML = `
-                <td>${new Date(assessment.createdAt || assessment.created_at || Date.now()).toLocaleDateString()}</td>
-                <td>${assessment.facilityName || assessment.facility_name || 'N/A'}</td>
-                <td>${assessment.assessmentType || assessment.assessment_type || 'N/A'}</td>
-                <td><strong>${percentage}%</strong></td>
-                <td><span class="badge bg-${levelClass}">${assessment.performanceLevel || assessment.performance_level || 'N/A'}</span></td>
+                <td><strong>${hw.fullName}</strong></td>
+                <td>${hw.email || 'N/A'}</td>
+                <td>${hw.phoneNumber || 'N/A'}</td>
+                <td>${hw.facilityName || 'N/A'}</td>
+                <td>${hw.regionName || 'N/A'}</td>
+                <td>${hw.districtName || 'N/A'}</td>
+                <td>${hw.subcountyName || 'N/A'}</td>
+                <td><span class="badge bg-primary">${hw.assessmentCount}</span></td>
+                <td>${firstDate}</td>
+                <td>${lastDate}</td>
                 <td>
-                    <button class="btn btn-sm btn-primary view-assessment" data-id="${assessment.id}">
-                        <i class="bi bi-eye"></i> View
+                    <button class="btn btn-sm btn-primary view-performance" data-id="${hw.id}" data-name="${hw.fullName}">
+                        <i class="bi bi-graph-up"></i> View Performance
                     </button>
                 </td>
             `;
             tbody.appendChild(row);
         });
 
-        // Add click handlers for view buttons
-        container.querySelectorAll('.view-assessment').forEach(btn => {
+        // Add click handlers for view performance buttons
+        container.querySelectorAll('.view-performance').forEach(btn => {
             btn.addEventListener('click', function() {
-                const assessmentId = this.dataset.id;
-                window.location.href = `view-assessment.html?id=${assessmentId}`;
+                const healthWorkerId = this.dataset.id;
+                const startDate = document.getElementById('startDate') ? document.getElementById('startDate').value : '';
+                const endDate = document.getElementById('endDate') ? document.getElementById('endDate').value : '';
+                const params = new URLSearchParams();
+                if (startDate) params.append('startDate', startDate);
+                if (endDate) params.append('endDate', endDate);
+                window.location.href = `health-worker-performance.html?id=${healthWorkerId}&${params.toString()}`;
             });
         });
     } catch (error) {
-        console.error('Error loading assessments:', error);
+        console.error('Error loading health workers:', error);
         const container = document.getElementById('assessmentsList');
         if (container) {
-            container.innerHTML = `<div class="alert alert-danger">Error loading assessments: ${error.message || 'Unknown error'}. Please try again or contact support.</div>`;
+            container.innerHTML = `<div class="alert alert-danger">Error loading health workers: ${error.message || 'Unknown error'}. Please try again or contact support.</div>`;
         }
     }
 }
-

@@ -111,6 +111,18 @@ func main() {
 	api.Put("/facilities/:id", handlers.CheckPermission("facilities.manage"), handlers.UpdateFacility)
 	api.Delete("/facilities/:id", handlers.CheckPermission("facilities.manage"), handlers.DeleteFacility)
 
+	// Health worker routes
+	api.Get("/health-workers", handlers.CheckPermission("health_workers.view"), handlers.GetHealthWorkers)
+	api.Get("/health-workers/:id", handlers.CheckPermission("health_workers.view"), handlers.GetHealthWorker)
+	api.Post("/health-workers", handlers.CheckPermission("health_workers.create"), handlers.CreateHealthWorker)
+	api.Put("/health-workers/:id", handlers.CheckPermission("health_workers.edit"), handlers.UpdateHealthWorker)
+	api.Post("/health-workers/:id/move", handlers.CheckPermission("health_workers.edit"), handlers.MoveHealthWorker)
+	api.Delete("/health-workers/:id", handlers.CheckPermission("health_workers.delete"), handlers.DeleteHealthWorker)
+	api.Get("/health-workers/:id/assessments", handlers.CheckPermission("health_workers.view"), handlers.GetHealthWorkerAssessments)
+	api.Get("/health-workers-with-assessments", handlers.CheckPermission("health_workers.view"), handlers.GetHealthWorkersWithAssessments)
+	api.Get("/health-workers/:id/performance", handlers.CheckPermission("health_workers.view"), handlers.GetHealthWorkerPerformance)
+	api.Get("/health-workers/:id/thematic-areas/:thematicAreaId/details", handlers.CheckPermission("health_workers.view"), handlers.GetHealthWorkerThematicAreaDetails)
+
 	// Assessment routes
 	api.Get("/assessment-types", handlers.CheckPermission("assessments.view"), handlers.GetAssessmentTypes)
 	api.Get("/assessment-types/:typeId/thematic-areas", handlers.CheckPermission("assessments.view"), handlers.GetThematicAreas)
@@ -150,6 +162,7 @@ func main() {
 
 	// Reports
 	api.Get("/reports/assessments/pdf", handlers.CheckPermission("reports.export"), handlers.ExportAssessmentsPDF)
+	api.Get("/reports/assessments/xls", handlers.CheckPermission("reports.export"), handlers.ExportAssessmentsXLS)
 
 	log.Printf("Server starting on port %s", cfg.Port)
 	log.Fatal(app.Listen(":" + cfg.Port))

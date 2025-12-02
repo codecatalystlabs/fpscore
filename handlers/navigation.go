@@ -92,5 +92,14 @@ func GetNavigationItems(c *fiber.Ctx) error {
 		})
 	}
 
+	// Health Workers - needs health_workers.view
+	if hasPermission("health_workers.view") || hasPermission("health_workers.create") {
+		items = append(items, NavigationItem{
+			Label: "Health Workers",
+			URL:   "health-workers.html",
+			Icon:  "bi-person-badge",
+		})
+	}
+
 	return c.JSON(items)
 }

@@ -29,6 +29,18 @@ type Facility struct {
 	Name        string `json:"name"`
 }
 
+// HealthWorker represents a health worker
+type HealthWorker struct {
+	ID           int            `json:"id"`
+	FullName     string         `json:"fullName"`
+	Email        sql.NullString `json:"email"`
+	PhoneNumber  sql.NullString `json:"phoneNumber"`
+	FacilityID   int            `json:"facilityId"`
+	FacilityName string         `json:"facilityName,omitempty"`
+	CreatedAt    string         `json:"createdAt,omitempty"`
+	UpdatedAt    string         `json:"updatedAt,omitempty"`
+}
+
 // AssessmentType represents a type of assessment
 type AssessmentType struct {
 	ID   int    `json:"id"`
@@ -58,6 +70,8 @@ type Question struct {
 // Assessment represents a completed assessment
 type Assessment struct {
 	ID                 int            `json:"id"`
+	HealthWorkerID     int            `json:"healthWorkerId"`
+	HealthWorkerName   string         `json:"healthWorkerName,omitempty"`
 	FacilityID         int            `json:"facilityId"`
 	AssessmentTypeID   int            `json:"assessmentTypeId"`
 	AssessorName       sql.NullString `json:"assessorName"`

@@ -82,6 +82,7 @@ async function loadAssessment(assessmentId) {
         const thematicScores = data.thematicScores || [];
         
         // Populate assessment info
+        const healthWorkerNameEl = document.getElementById('healthWorkerName');
         const facilityNameEl = document.getElementById('facilityName');
         const assessmentTypeEl = document.getElementById('assessmentType');
         const assessmentDateEl = document.getElementById('assessmentDate');
@@ -97,6 +98,7 @@ async function loadAssessment(assessmentId) {
             return null;
         };
         
+        if (healthWorkerNameEl) healthWorkerNameEl.textContent = assessment.HealthWorkerName || 'N/A';
         if (facilityNameEl) facilityNameEl.textContent = assessment.FacilityName || 'N/A';
         if (assessmentTypeEl) assessmentTypeEl.textContent = assessment.AssessmentType || 'N/A';
         if (assessmentDateEl) assessmentDateEl.textContent = new Date(assessment.CreatedAt || Date.now()).toLocaleString();

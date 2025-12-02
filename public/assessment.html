@@ -100,12 +100,15 @@
                     </div>
                     <div class="row mt-2">
                         <div class="col-md-6">
-                            <label class="form-label">Assessor Name</label>
-                            <input type="text" class="form-control form-control-sm" id="assessorName">
+                            <label class="form-label">Health Worker <span class="text-danger">*</span></label>
+                            <select class="form-select form-select-sm" id="healthWorkerSelect" required disabled>
+                                <option value="">Loading...</option>
+                            </select>
+                            <small class="text-muted">Health worker selected from previous page</small>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label">Client Name (Optional)</label>
-                            <input type="text" class="form-control form-control-sm" id="clientName">
+                            <label class="form-label">Assessor Name</label>
+                            <input type="text" class="form-control form-control-sm" id="assessorName">
                         </div>
                     </div>
                     <div class="row mt-2">

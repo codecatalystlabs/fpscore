@@ -16,6 +16,7 @@ let assessmentData = {
     typeId: null,
     facilityId: null,
     facilityName: null,
+    healthWorkerId: null,
     thematicAreas: [],
     responses: {}
 };
@@ -24,6 +25,7 @@ let assessmentData = {
 document.addEventListener('DOMContentLoaded', function() {
     const urlParams = new URLSearchParams(window.location.search);
     assessmentData.typeId = urlParams.get('typeId');
+    assessmentData.healthWorkerId = urlParams.get('healthWorkerId');
     assessmentData.facilityId = urlParams.get('facilityId');
     assessmentData.facilityName = decodeURIComponent(urlParams.get('facilityName') || '');
     
@@ -31,12 +33,52 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('assessmentTypeName').textContent = urlParams.get('typeCode') || '';
     document.getElementById('assessmentTypeDisplay').textContent = urlParams.get('typeCode') || '';
     
-    if (assessmentData.typeId) {
-        loadThematicAreas();
+    if (assessmentData.typeId && assessmentData.healthWorkerId) {
+        loadHealthWorkerInfo().then(() => {
+            loadThematicAreas();
+        });
+    } else {
+        alert('Missing required parameters. Please go back and select a health worker and assessment type.');
+        window.location.href = 'home.html';
     }
     
     document.getElementById('submitAssessment').addEventListener('click', submitAssessment);
 });
+
+// Load health worker info and set it in the form
+async function loadHealthWorkerInfo() {
+    try {
+        const response = await fetch(`${API_BASE}/health-workers/${assessmentData.healthWorkerId}`, {
+            headers: getAuthHeaders(null)
+        });
+        if (!response.ok) {
+            throw new Error('Failed to load health worker information');
+        }
+        const healthWorker = await response.json();
+        
+        const select = document.getElementById('healthWorkerSelect');
+        if (select) {
+            // Set the health worker in the dropdown (read-only)
+            select.innerHTML = '';
+            const option = document.createElement('option');
+            option.value = healthWorker.id;
+            option.textContent = healthWorker.fullName + (healthWorker.email ? ` (${healthWorker.email})` : '') + (healthWorker.phoneNumber ? ` - ${healthWorker.phoneNumber}` : '');
+            option.selected = true;
+            select.appendChild(option);
+            select.disabled = true; // Make it read-only since it was selected on home page
+        }
+        
+        // Update facility name if not already set
+        if (!assessmentData.facilityName && healthWorker.facilityName) {
+            assessmentData.facilityName = healthWorker.facilityName;
+            assessmentData.facilityId = healthWorker.facilityId;
+            document.getElementById('facilityName').textContent = healthWorker.facilityName;
+        }
+    } catch (error) {
+        console.error('Error loading health worker:', error);
+        alert(`Error loading health worker information: ${error.message || 'Unknown error'}. Please try again.`);
+    }
+}
 
 // Load thematic areas and questions
 async function loadThematicAreas() {
@@ -325,23 +367,33 @@ async function submitAssessment() {
         return;
     }
     
+    // Validate health worker selection
+    if (!assessmentData.healthWorkerId) {
+        alert('Health worker information is missing. Please go back and select a health worker.');
+        return;
+    }
+    const healthWorkerId = parseInt(assessmentData.healthWorkerId, 10);
+    if (!Number.isInteger(healthWorkerId) || healthWorkerId <= 0) {
+        alert('Health worker information is invalid. Please go back and select a health worker again.');
+        return;
+    }
+    
     const submitBtn = document.getElementById('submitAssessment');
     submitBtn.disabled = true;
     submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Submitting...';
     
     try {
         const assessorName = document.getElementById('assessorName').value;
-        const clientName = document.getElementById('clientName').value;
         const notes = document.getElementById('notes').value;
         
         const response = await fetch(`${API_BASE}/assessments`, {
             method: 'POST',
             headers: getAuthHeaders('application/json'),
             body: JSON.stringify({
+                healthWorkerId: healthWorkerId,
                 facilityId: parseInt(assessmentData.facilityId),
                 assessmentTypeId: parseInt(assessmentData.typeId),
                 assessorName: assessorName,
-                clientName: clientName,
                 notes: notes,
                 responses: assessmentData.responses
             })

@@ -536,6 +536,7 @@ func GetQuestions(c *fiber.Ctx) error {
 
 // Assessment handlers
 type CreateAssessmentRequest struct {
+	HealthWorkerID   int               `json:"healthWorkerId"`
 	FacilityID       int               `json:"facilityId"`
 	AssessmentTypeID int               `json:"assessmentTypeId"`
 	AssessorName     string            `json:"assessorName"`
@@ -593,15 +594,27 @@ func CreateAssessment(c *fiber.Ctx) error {
 	}
 	rows.Close()
 
+	// Validate health worker exists and get their facility
+	var healthWorkerFacilityID int
+	err = tx.QueryRow("SELECT facility_id FROM health_workers WHERE id = $1", req.HealthWorkerID).Scan(&healthWorkerFacilityID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return fiber.NewError(400, "Health worker not found")
+		}
+		return err
+	}
+	// Use the health worker's facility (they may have moved, so use current facility)
+	req.FacilityID = healthWorkerFacilityID
+
 	// Insert assessment first (we'll update scores after processing responses)
 	var assessmentID int
 	err = tx.QueryRow(`
 		INSERT INTO assessments 
-		(facility_id, assessment_type_id, assessor_name, client_name, notes, 
+		(health_worker_id, facility_id, assessment_type_id, assessor_name, client_name, notes, 
 		 total_possible_score, achieved_score, percentage_score, performance_level)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		RETURNING id
-	`, req.FacilityID, req.AssessmentTypeID, req.AssessorName, req.ClientName, req.Notes,
+	`, req.HealthWorkerID, req.FacilityID, req.AssessmentTypeID, req.AssessorName, req.ClientName, req.Notes,
 		0, 0, 0.0, "Not Acceptable").Scan(&assessmentID)
 	if err != nil {
 		return err
@@ -733,8 +746,10 @@ func GetAssessments(c *fiber.Ctx) error {
 		SELECT a.id, a.created_at, a.percentage_score, a.performance_level,
 		       f.name as facility_name, at.name as assessment_type,
 		       a.assessor_name, a.client_name, 
-		       r.id as region_id, d.id as district_id, s.id as subcounty_id, f.id as facility_id
+		       r.id as region_id, d.id as district_id, s.id as subcounty_id, f.id as facility_id,
+		       hw.id as health_worker_id, hw.full_name as health_worker_name
 		FROM assessments a
+		JOIN health_workers hw ON a.health_worker_id = hw.id
 		JOIN facilities f ON a.facility_id = f.id
 		JOIN subcounties s ON f.subcounty_id = s.id
 		JOIN districts d ON s.district_id = d.id
@@ -846,9 +861,9 @@ func GetAssessments(c *fiber.Ctx) error {
 		var id int
 		var createdAt, assessorName, clientName sql.NullString
 		var percentage float64
-		var performanceLevel, facilityName, assessmentType string
-		var regionID, districtID, subcountyID, facilityID sql.NullInt64
-		if err := rows.Scan(&id, &createdAt, &percentage, &performanceLevel, &facilityName, &assessmentType, &assessorName, &clientName, &regionID, &districtID, &subcountyID, &facilityID); err != nil {
+		var performanceLevel, facilityName, assessmentType, healthWorkerName string
+		var regionID, districtID, subcountyID, facilityID, healthWorkerID sql.NullInt64
+		if err := rows.Scan(&id, &createdAt, &percentage, &performanceLevel, &facilityName, &assessmentType, &assessorName, &clientName, &regionID, &districtID, &subcountyID, &facilityID, &healthWorkerID, &healthWorkerName); err != nil {
 			return err
 		}
 
@@ -861,6 +876,8 @@ func GetAssessments(c *fiber.Ctx) error {
 			"assessmentType":   assessmentType,
 			"assessorName":     assessorName.String,
 			"clientName":       clientName.String,
+			"healthWorkerId":   healthWorkerID.Int64,
+			"healthWorkerName": healthWorkerName,
 		})
 	}
 
@@ -886,6 +903,7 @@ func GetAssessment(c *fiber.Ctx) error {
 
 	var assessment struct {
 		ID               int
+		HealthWorkerName string
 		FacilityName     string
 		AssessmentType   string
 		AssessorName     sql.NullString
@@ -904,11 +922,12 @@ func GetAssessment(c *fiber.Ctx) error {
 
 	// Build query with admin area check
 	query := `
-		SELECT a.id, f.name, at.name, a.assessor_name, a.client_name, a.notes,
+		SELECT a.id, hw.full_name, f.name, at.name, a.assessor_name, a.client_name, a.notes,
 		       a.total_possible_score, a.achieved_score, a.percentage_score,
 		       a.performance_level, a.created_at,
 		       r.id as region_id, d.id as district_id, s.id as subcounty_id, f.id as facility_id
 		FROM assessments a
+		JOIN health_workers hw ON a.health_worker_id = hw.id
 		JOIN facilities f ON a.facility_id = f.id
 		JOIN subcounties s ON f.subcounty_id = s.id
 		JOIN districts d ON s.district_id = d.id
@@ -980,7 +999,7 @@ func GetAssessment(c *fiber.Ctx) error {
 	}
 
 	err = database.DB.QueryRow(query, args...).Scan(
-		&assessment.ID, &assessment.FacilityName, &assessment.AssessmentType,
+		&assessment.ID, &assessment.HealthWorkerName, &assessment.FacilityName, &assessment.AssessmentType,
 		&assessment.AssessorName, &assessment.ClientName, &assessment.Notes,
 		&assessment.TotalPossible, &assessment.Achieved, &assessment.Percentage,
 		&assessment.PerformanceLevel, &assessment.CreatedAt,

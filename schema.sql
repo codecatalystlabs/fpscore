@@ -31,6 +31,23 @@ CREATE TABLE IF NOT EXISTS facilities (
     UNIQUE(subcounty_id, name)
 );
 
+-- Health workers table
+CREATE TABLE IF NOT EXISTS health_workers (
+    id SERIAL PRIMARY KEY,
+    full_name VARCHAR(255) NOT NULL,
+    email VARCHAR(255),
+    phone_number VARCHAR(50),
+    facility_id INTEGER NOT NULL REFERENCES facilities(id) ON DELETE RESTRICT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    -- Ensure at least one of email or phone is provided
+    CONSTRAINT check_email_or_phone CHECK (email IS NOT NULL OR phone_number IS NOT NULL),
+    -- Ensure email is unique if provided
+    CONSTRAINT unique_email UNIQUE (email),
+    -- Ensure phone is unique if provided
+    CONSTRAINT unique_phone UNIQUE (phone_number)
+);
+
 -- Assessment types
 CREATE TABLE IF NOT EXISTS assessment_types (
     id SERIAL PRIMARY KEY,
@@ -63,7 +80,8 @@ CREATE TABLE IF NOT EXISTS questions (
 -- Main assessment records
 CREATE TABLE IF NOT EXISTS assessments (
     id SERIAL PRIMARY KEY,
-    facility_id INTEGER NOT NULL REFERENCES facilities(id) ON DELETE CASCADE,
+    health_worker_id INTEGER NOT NULL REFERENCES health_workers(id) ON DELETE CASCADE,
+    facility_id INTEGER NOT NULL REFERENCES facilities(id) ON DELETE RESTRICT,
     assessment_type_id INTEGER NOT NULL REFERENCES assessment_types(id) ON DELETE CASCADE,
     assessor_name VARCHAR(255),
     client_name VARCHAR(255),
@@ -105,6 +123,10 @@ CREATE INDEX IF NOT EXISTS idx_subcounties_district ON subcounties(district_id);
 CREATE INDEX IF NOT EXISTS idx_facilities_subcounty ON facilities(subcounty_id);
 CREATE INDEX IF NOT EXISTS idx_thematic_areas_assessment ON thematic_areas(assessment_type_id);
 CREATE INDEX IF NOT EXISTS idx_questions_thematic ON questions(thematic_area_id);
+CREATE INDEX IF NOT EXISTS idx_health_workers_facility ON health_workers(facility_id);
+CREATE INDEX IF NOT EXISTS idx_health_workers_email ON health_workers(email) WHERE email IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_health_workers_phone ON health_workers(phone_number) WHERE phone_number IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_assessments_health_worker ON assessments(health_worker_id);
 CREATE INDEX IF NOT EXISTS idx_assessments_facility ON assessments(facility_id);
 CREATE INDEX IF NOT EXISTS idx_assessments_type ON assessments(assessment_type_id);
 CREATE INDEX IF NOT EXISTS idx_assessment_responses_assessment ON assessment_responses(assessment_id);

@@ -12,8 +12,8 @@ DECLARE
     thematic_area_rec RECORD;
     assessment_id_var INTEGER;
     total_possible INTEGER;
-    achieved_score INTEGER;
-    percentage_score DECIMAL(5,2);
+    achieved_score_var INTEGER;
+    percentage_score_var DECIMAL(5,2);
     performance_level_var VARCHAR(50);
     ta_possible INTEGER;
     ta_achieved INTEGER;
@@ -24,19 +24,34 @@ DECLARE
     assessor_names TEXT[] := ARRAY['Dr. Sarah Nakato', 'Dr. James Ochieng', 'Nurse Mary Achieng', 'Dr. Peter Okello', 'Nurse Grace Atim'];
     client_names TEXT[] := ARRAY['Client A', 'Client B', 'Client C', 'Client D', 'Client E'];
     assessment_counter INTEGER := 0;
+    health_worker_id_var INTEGER;
 BEGIN
     -- Loop through each facility
     FOR facility_rec IN SELECT id FROM facilities ORDER BY id LIMIT 5 LOOP
+        -- Get a random health worker for this facility (or create one if none exist)
+        SELECT id INTO health_worker_id_var 
+        FROM health_workers 
+        WHERE facility_id = facility_rec.id 
+        ORDER BY RANDOM() 
+        LIMIT 1;
+        
+        -- If no health worker exists for this facility, skip it
+        IF health_worker_id_var IS NULL THEN
+            RAISE NOTICE 'No health workers found for facility %, skipping assessments', facility_rec.id;
+            CONTINUE;
+        END IF;
+        
         -- Loop through each assessment type
         FOR assessment_type_rec IN SELECT id, name FROM assessment_types ORDER BY id LOOP
             assessment_counter := assessment_counter + 1;
             
             -- Initialize scores
             total_possible := 0;
-            achieved_score := 0;
+            achieved_score_var := 0;
             
             -- Create assessment record
             INSERT INTO assessments (
+                health_worker_id,
                 facility_id,
                 assessment_type_id,
                 assessor_name,
@@ -48,6 +63,7 @@ BEGIN
                 performance_level,
                 created_at
             ) VALUES (
+                health_worker_id_var,
                 facility_rec.id,
                 assessment_type_rec.id,
                 assessor_names[1 + (assessment_counter % array_length(assessor_names, 1))],
@@ -126,7 +142,7 @@ BEGIN
                     -- "NA" questions don't count toward possible score at all
                     IF response_val = 'Yes' THEN
                         total_possible := total_possible + question_rec.score_weight;
-                        achieved_score := achieved_score + points_earned_var;
+                        achieved_score_var := achieved_score_var + points_earned_var;
                         ta_possible := ta_possible + question_rec.score_weight;
                         ta_achieved := ta_achieved + points_earned_var;
                     ELSIF response_val = 'No' THEN
@@ -175,15 +191,15 @@ BEGIN
             
             -- Calculate overall percentage and performance level
             IF total_possible > 0 THEN
-                percentage_score := (achieved_score::DECIMAL / total_possible::DECIMAL) * 100.0;
+                percentage_score_var := (achieved_score_var::DECIMAL / total_possible::DECIMAL) * 100.0;
             ELSE
-                percentage_score := 0.0;
+                percentage_score_var := 0.0;
             END IF;
             
             -- Determine performance level
-            IF percentage_score > 90 THEN
+            IF percentage_score_var > 90 THEN
                 performance_level_var := 'Proficient';
-            ELSIF percentage_score >= 70 THEN
+            ELSIF percentage_score_var >= 70 THEN
                 performance_level_var := 'Competent';
             ELSE
                 performance_level_var := 'Not Acceptable';
@@ -192,8 +208,8 @@ BEGIN
             -- Update assessment with calculated scores
             UPDATE assessments
             SET total_possible_score = total_possible,
-                achieved_score = achieved_score,
-                percentage_score = percentage_score,
+                achieved_score = achieved_score_var,
+                percentage_score = percentage_score_var,
                 performance_level = performance_level_var
             WHERE id = assessment_id_var;
             
@@ -213,8 +229,8 @@ DECLARE
     thematic_area_rec RECORD;
     assessment_id_var INTEGER;
     total_possible INTEGER;
-    achieved_score INTEGER;
-    percentage_score DECIMAL(5,2);
+    achieved_score_var INTEGER;
+    percentage_score_var DECIMAL(5,2);
     performance_level_var VARCHAR(50);
     ta_possible INTEGER;
     ta_achieved INTEGER;
@@ -224,15 +240,30 @@ DECLARE
     rand_val INTEGER;
     facility_count INTEGER;
     type_count INTEGER;
+    health_worker_id_var INTEGER;
 BEGIN
     -- Get first facility and first 3 assessment types for high performers
     SELECT id INTO facility_rec FROM facilities ORDER BY id LIMIT 1;
     
+    -- Get a health worker for this facility
+    SELECT id INTO health_worker_id_var 
+    FROM health_workers 
+    WHERE facility_id = facility_rec.id 
+    ORDER BY RANDOM() 
+    LIMIT 1;
+    
+    -- Skip if no health worker exists
+    IF health_worker_id_var IS NULL THEN
+        RAISE NOTICE 'No health workers found for facility %, skipping high performer assessments', facility_rec.id;
+        RETURN;
+    END IF;
+    
     FOR assessment_type_rec IN SELECT id, name FROM assessment_types ORDER BY id LIMIT 3 LOOP
         total_possible := 0;
-        achieved_score := 0;
+            achieved_score_var := 0;
         
         INSERT INTO assessments (
+            health_worker_id,
             facility_id,
             assessment_type_id,
             assessor_name,
@@ -244,6 +275,7 @@ BEGIN
             performance_level,
             created_at
         ) VALUES (
+            health_worker_id_var,
             facility_rec.id,
             assessment_type_rec.id,
             'Dr. Excellent Provider',
@@ -293,7 +325,7 @@ BEGIN
                 -- "NA" questions don't count toward possible score at all
                 IF response_val = 'Yes' THEN
                     total_possible := total_possible + question_rec.score_weight;
-                    achieved_score := achieved_score + points_earned_var;
+                        achieved_score_var := achieved_score_var + points_earned_var;
                     ta_possible := ta_possible + question_rec.score_weight;
                     ta_achieved := ta_achieved + points_earned_var;
                 ELSIF response_val = 'No' THEN
@@ -338,17 +370,17 @@ BEGIN
         END LOOP;
         
         IF total_possible > 0 THEN
-            percentage_score := (achieved_score::DECIMAL / total_possible::DECIMAL) * 100.0;
+                percentage_score_var := (achieved_score_var::DECIMAL / total_possible::DECIMAL) * 100.0;
         ELSE
-            percentage_score := 0.0;
+            percentage_score_var := 0.0;
         END IF;
         
         performance_level_var := 'Proficient';
         
         UPDATE assessments
         SET total_possible_score = total_possible,
-            achieved_score = achieved_score,
-            percentage_score = percentage_score,
+                achieved_score = achieved_score_var,
+            percentage_score = percentage_score_var,
             performance_level = performance_level_var
         WHERE id = assessment_id_var;
     END LOOP;
@@ -363,8 +395,8 @@ DECLARE
     thematic_area_rec RECORD;
     assessment_id_var INTEGER;
     total_possible INTEGER;
-    achieved_score INTEGER;
-    percentage_score DECIMAL(5,2);
+    achieved_score_var INTEGER;
+    percentage_score_var DECIMAL(5,2);
     performance_level_var VARCHAR(50);
     ta_possible INTEGER;
     ta_achieved INTEGER;
@@ -372,15 +404,30 @@ DECLARE
     response_val VARCHAR(10);
     points_earned_var INTEGER;
     rand_val INTEGER;
+    health_worker_id_var INTEGER;
 BEGIN
     -- Get second facility and middle assessment types
     SELECT id INTO facility_rec FROM facilities ORDER BY id OFFSET 1 LIMIT 1;
     
+    -- Get a health worker for this facility
+    SELECT id INTO health_worker_id_var 
+    FROM health_workers 
+    WHERE facility_id = facility_rec.id 
+    ORDER BY RANDOM() 
+    LIMIT 1;
+    
+    -- Skip if no health worker exists
+    IF health_worker_id_var IS NULL THEN
+        RAISE NOTICE 'No health workers found for facility %, skipping competent assessments', facility_rec.id;
+        RETURN;
+    END IF;
+    
     FOR assessment_type_rec IN SELECT id, name FROM assessment_types ORDER BY id OFFSET 3 LIMIT 3 LOOP
         total_possible := 0;
-        achieved_score := 0;
+            achieved_score_var := 0;
         
         INSERT INTO assessments (
+            health_worker_id,
             facility_id,
             assessment_type_id,
             assessor_name,
@@ -392,6 +439,7 @@ BEGIN
             performance_level,
             created_at
         ) VALUES (
+            health_worker_id_var,
             facility_rec.id,
             assessment_type_rec.id,
             'Nurse Average Provider',
@@ -441,7 +489,7 @@ BEGIN
                 -- "NA" questions don't count toward possible score at all
                 IF response_val = 'Yes' THEN
                     total_possible := total_possible + question_rec.score_weight;
-                    achieved_score := achieved_score + points_earned_var;
+                        achieved_score_var := achieved_score_var + points_earned_var;
                     ta_possible := ta_possible + question_rec.score_weight;
                     ta_achieved := ta_achieved + points_earned_var;
                 ELSIF response_val = 'No' THEN
@@ -486,14 +534,14 @@ BEGIN
         END LOOP;
         
         IF total_possible > 0 THEN
-            percentage_score := (achieved_score::DECIMAL / total_possible::DECIMAL) * 100.0;
+            percentage_score_var := (achieved_score_var::DECIMAL / total_possible::DECIMAL) * 100.0;
         ELSE
-            percentage_score := 0.0;
+            percentage_score_var := 0.0;
         END IF;
         
-        IF percentage_score > 90 THEN
+        IF percentage_score_var > 90 THEN
             performance_level_var := 'Proficient';
-        ELSIF percentage_score >= 70 THEN
+        ELSIF percentage_score_var >= 70 THEN
             performance_level_var := 'Competent';
         ELSE
             performance_level_var := 'Not Acceptable';
@@ -501,8 +549,8 @@ BEGIN
         
         UPDATE assessments
         SET total_possible_score = total_possible,
-            achieved_score = achieved_score,
-            percentage_score = percentage_score,
+            achieved_score = achieved_score_var,
+            percentage_score = percentage_score_var,
             performance_level = performance_level_var
         WHERE id = assessment_id_var;
     END LOOP;
@@ -517,8 +565,8 @@ DECLARE
     thematic_area_rec RECORD;
     assessment_id_var INTEGER;
     total_possible INTEGER;
-    achieved_score INTEGER;
-    percentage_score DECIMAL(5,2);
+    achieved_score_var INTEGER;
+    percentage_score_var DECIMAL(5,2);
     performance_level_var VARCHAR(50);
     ta_possible INTEGER;
     ta_achieved INTEGER;
@@ -526,15 +574,30 @@ DECLARE
     response_val VARCHAR(10);
     points_earned_var INTEGER;
     rand_val INTEGER;
+    health_worker_id_var INTEGER;
 BEGIN
     -- Get third facility and last assessment types
     SELECT id INTO facility_rec FROM facilities ORDER BY id OFFSET 2 LIMIT 1;
     
+    -- Get a health worker for this facility
+    SELECT id INTO health_worker_id_var 
+    FROM health_workers 
+    WHERE facility_id = facility_rec.id 
+    ORDER BY RANDOM() 
+    LIMIT 1;
+    
+    -- Skip if no health worker exists
+    IF health_worker_id_var IS NULL THEN
+        RAISE NOTICE 'No health workers found for facility %, skipping low performer assessments', facility_rec.id;
+        RETURN;
+    END IF;
+    
     FOR assessment_type_rec IN SELECT id, name FROM assessment_types ORDER BY id OFFSET 6 LOOP
         total_possible := 0;
-        achieved_score := 0;
+            achieved_score_var := 0;
         
         INSERT INTO assessments (
+            health_worker_id,
             facility_id,
             assessment_type_id,
             assessor_name,
@@ -546,6 +609,7 @@ BEGIN
             performance_level,
             created_at
         ) VALUES (
+            health_worker_id_var,
             facility_rec.id,
             assessment_type_rec.id,
             'Provider Needs Training',
@@ -595,7 +659,7 @@ BEGIN
                 -- "NA" questions don't count toward possible score at all
                 IF response_val = 'Yes' THEN
                     total_possible := total_possible + question_rec.score_weight;
-                    achieved_score := achieved_score + points_earned_var;
+                        achieved_score_var := achieved_score_var + points_earned_var;
                     ta_possible := ta_possible + question_rec.score_weight;
                     ta_achieved := ta_achieved + points_earned_var;
                 ELSIF response_val = 'No' THEN
@@ -640,17 +704,17 @@ BEGIN
         END LOOP;
         
         IF total_possible > 0 THEN
-            percentage_score := (achieved_score::DECIMAL / total_possible::DECIMAL) * 100.0;
+                percentage_score_var := (achieved_score_var::DECIMAL / total_possible::DECIMAL) * 100.0;
         ELSE
-            percentage_score := 0.0;
+            percentage_score_var := 0.0;
         END IF;
         
         performance_level_var := 'Not Acceptable';
         
         UPDATE assessments
         SET total_possible_score = total_possible,
-            achieved_score = achieved_score,
-            percentage_score = percentage_score,
+                achieved_score = achieved_score_var,
+            percentage_score = percentage_score_var,
             performance_level = performance_level_var
         WHERE id = assessment_id_var;
     END LOOP;

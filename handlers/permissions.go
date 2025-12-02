@@ -28,6 +28,10 @@ var PredefinedPermissions = []models.Permission{
 	{Code: "facilities.manage", Description: "Manage facilities"},
 	{Code: "admin.areas.view", Description: "View administrative areas"},
 	{Code: "admin.areas.manage", Description: "Manage administrative areas"},
+	{Code: "health_workers.view", Description: "View health workers"},
+	{Code: "health_workers.create", Description: "Create health workers"},
+	{Code: "health_workers.edit", Description: "Edit health workers"},
+	{Code: "health_workers.delete", Description: "Delete health workers"},
 }
 
 // GetPredefinedPermissions returns the list of all predefined permissions

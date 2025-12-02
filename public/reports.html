@@ -51,8 +51,23 @@
                                 </select>
                             </div>
                         </div>
+                        <div class="row g-3 mt-2">
+                            <div class="col-md-3">
+                                <label class="form-label">Facility</label>
+                                <select class="form-select" id="filterFacility" disabled>
+                                    <option value="">All Facilities</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Health Worker</label>
+                                <select class="form-select" id="filterHealthWorker" disabled>
+                                    <option value="">All Health Workers</option>
+                                </select>
+                            </div>
+                        </div>
                         <div class="mt-3">
-                            <button class="btn btn-outline-primary" onclick="exportPDF()"><i class="bi bi-filetype-pdf"></i> Export PDF</button>
+                            <button class="btn btn-outline-primary me-2" onclick="exportPDF()"><i class="bi bi-filetype-pdf"></i> Export PDF</button>
+                            <button class="btn btn-outline-success" onclick="exportXLS()"><i class="bi bi-file-earmark-spreadsheet"></i> Export Excel</button>
                         </div>
                     </div>
                 </div>
@@ -108,10 +123,62 @@
         document.getElementById('filterRegion').addEventListener('change', async function() {
             const regionId = this.value;
             const select = document.getElementById('filterDistrict');
-            if (!regionId) { select.innerHTML = '<option value="">All Districts</option>'; select.disabled = true; return; }
+            if (!regionId) { 
+                select.innerHTML = '<option value="">All Districts</option>'; 
+                select.disabled = true; 
+                document.getElementById('filterFacility').innerHTML = '<option value="">All Facilities</option>';
+                document.getElementById('filterFacility').disabled = true;
+                document.getElementById('filterHealthWorker').innerHTML = '<option value="">All Health Workers</option>';
+                document.getElementById('filterHealthWorker').disabled = true;
+                return; 
+            }
             const districts = await fetch(`${API_BASE}/districts/${regionId}`, {headers: getAuthHeaders()}).then(r=>r.json());
             select.innerHTML = '<option value="">All Districts</option>';
             districts.forEach(d => { const opt = document.createElement('option'); opt.value=d.id; opt.textContent=d.name; select.appendChild(opt); });
+            select.disabled = false;
+        });
+
+        document.getElementById('filterDistrict').addEventListener('change', async function() {
+            const districtId = this.value;
+            const select = document.getElementById('filterFacility');
+            if (!districtId) { 
+                select.innerHTML = '<option value="">All Facilities</option>'; 
+                select.disabled = true;
+                document.getElementById('filterHealthWorker').innerHTML = '<option value="">All Health Workers</option>';
+                document.getElementById('filterHealthWorker').disabled = true;
+                return; 
+            }
+            // Get subcounties first, then facilities
+            const subcounties = await fetch(`${API_BASE}/subcounties/${districtId}`, {headers: getAuthHeaders()}).then(r=>r.json());
+            select.innerHTML = '<option value="">All Facilities</option>';
+            for (const subcounty of subcounties) {
+                const facilities = await fetch(`${API_BASE}/facilities/${subcounty.id}`, {headers: getAuthHeaders()}).then(r=>r.json());
+                facilities.forEach(f => {
+                    const opt = document.createElement('option');
+                    opt.value = f.id;
+                    opt.textContent = f.name;
+                    select.appendChild(opt);
+                });
+            }
+            select.disabled = false;
+        });
+
+        document.getElementById('filterFacility').addEventListener('change', async function() {
+            const facilityId = this.value;
+            const select = document.getElementById('filterHealthWorker');
+            if (!facilityId) { 
+                select.innerHTML = '<option value="">All Health Workers</option>'; 
+                select.disabled = true;
+                return; 
+            }
+            const healthWorkers = await fetch(`${API_BASE}/health-workers?facilityId=${facilityId}`, {headers: getAuthHeaders()}).then(r=>r.json());
+            select.innerHTML = '<option value="">All Health Workers</option>';
+            healthWorkers.forEach(hw => {
+                const opt = document.createElement('option');
+                opt.value = hw.id;
+                opt.textContent = hw.fullName + (hw.email ? ` (${hw.email})` : '');
+                select.appendChild(opt);
+            });
             select.disabled = false;
         });
 
@@ -126,24 +193,108 @@
 
         // Make exportPDF available globally
         window.exportPDF = async function() {
-            const params = new URLSearchParams();
-            const r = document.getElementById('filterRegion').value;
-            const d = document.getElementById('filterDistrict').value;
-            const t = document.getElementById('filterAssessmentType').value;
-            const a = document.getElementById('filterThematicArea').value;
-            if (r) params.append('regionId', r);
-            if (d) params.append('districtId', d);
-            if (t) params.append('assessmentTypeId', t);
-            if (a) params.append('thematicAreaId', a);
+            try {
+                const params = new URLSearchParams();
+                const r = document.getElementById('filterRegion').value;
+                const d = document.getElementById('filterDistrict').value;
+                const f = document.getElementById('filterFacility').value;
+                const hw = document.getElementById('filterHealthWorker').value;
+                const t = document.getElementById('filterAssessmentType').value;
+                const a = document.getElementById('filterThematicArea').value;
+                if (r) params.append('regionId', r);
+                if (d) params.append('districtId', d);
+                if (f) params.append('facilityId', f);
+                if (hw) params.append('healthWorkerId', hw);
+                if (t) params.append('assessmentTypeId', t);
+                if (a) params.append('thematicAreaId', a);
 
-            const url = `${API_BASE}/reports/assessments/pdf?` + params.toString();
-            const resp = await fetch(url, { headers: getAuthHeaders() });
-            if (!resp.ok) { alert('Failed to export'); return; }
-            const blob = await resp.blob();
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = 'assessments.pdf';
-            link.click();
+                const url = `${API_BASE}/reports/assessments/pdf?` + params.toString();
+                console.log('Exporting PDF from:', url);
+                const resp = await fetch(url, { headers: getAuthHeaders() });
+                
+                if (!resp.ok) {
+                    const errorText = await resp.text();
+                    console.error('PDF export failed:', resp.status, errorText);
+                    alert('Failed to export PDF: ' + (errorText || resp.statusText));
+                    return;
+                }
+                
+                const blob = await resp.blob();
+                console.log('PDF blob received, size:', blob.size, 'bytes, type:', blob.type);
+                
+                if (blob.size === 0) {
+                    alert('The exported PDF file is empty. There may be no assessments matching your filters.');
+                    return;
+                }
+                
+                if (blob.type !== 'application/pdf' && blob.type !== '') {
+                    console.warn('Unexpected content type:', blob.type);
+                }
+                
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = 'assessments-report-' + new Date().toISOString().slice(0,10) + '.pdf';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                // Clean up the object URL after a delay
+                setTimeout(() => URL.revokeObjectURL(link.href), 100);
+            } catch (error) {
+                console.error('Error exporting PDF:', error);
+                alert('Error exporting PDF: ' + error.message);
+            }
+        };
+
+        // Make exportXLS available globally
+        window.exportXLS = async function() {
+            try {
+                const params = new URLSearchParams();
+                const r = document.getElementById('filterRegion').value;
+                const d = document.getElementById('filterDistrict').value;
+                const f = document.getElementById('filterFacility').value;
+                const hw = document.getElementById('filterHealthWorker').value;
+                const t = document.getElementById('filterAssessmentType').value;
+                const a = document.getElementById('filterThematicArea').value;
+                if (r) params.append('regionId', r);
+                if (d) params.append('districtId', d);
+                if (f) params.append('facilityId', f);
+                if (hw) params.append('healthWorkerId', hw);
+                if (t) params.append('assessmentTypeId', t);
+                if (a) params.append('thematicAreaId', a);
+
+                const url = `${API_BASE}/reports/assessments/xls?` + params.toString();
+                console.log('Exporting XLS from:', url);
+                const resp = await fetch(url, { headers: getAuthHeaders() });
+                
+                if (!resp.ok) {
+                    const errorText = await resp.text();
+                    console.error('XLS export failed:', resp.status, errorText);
+                    alert('Failed to export Excel: ' + (errorText || resp.statusText));
+                    return;
+                }
+                
+                const blob = await resp.blob();
+                console.log('XLS blob received, size:', blob.size, 'bytes, type:', blob.type);
+                
+                if (blob.size === 0) {
+                    alert('The exported Excel file is empty. There may be no assessments matching your filters.');
+                    return;
+                }
+                
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = 'assessments-report-' + new Date().toISOString().slice(0,10) + '.xlsx';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                // Clean up the object URL after a delay
+                setTimeout(() => URL.revokeObjectURL(link.href), 100);
+            } catch (error) {
+                console.error('Error exporting Excel:', error);
+                alert('Error exporting Excel: ' + error.message);
+            }
         };
 
         loadFilters().then(() => {
