@@ -438,12 +438,14 @@ func GetFacilities(c *fiber.Ctx) error {
 
 // Assessment type handlers
 func GetAssessmentTypes(c *fiber.Ctx) error {
-	rows, err := database.DB.Query("SELECT id, name, code FROM assessment_types ORDER BY name")
+	rows, err := database.DB.Query("SELECT DISTINCT id, name, code FROM assessment_types ORDER BY name")
 	if err != nil {
 		return err
 	}
 	defer rows.Close()
 
+	// Use a map to deduplicate by id in case of any duplicates
+	seenIds := make(map[int]bool)
 	var types []map[string]interface{}
 	for rows.Next() {
 		var id int
@@ -451,6 +453,11 @@ func GetAssessmentTypes(c *fiber.Ctx) error {
 		if err := rows.Scan(&id, &name, &code); err != nil {
 			return err
 		}
+		// Skip if we've already seen this ID
+		if seenIds[id] {
+			continue
+		}
+		seenIds[id] = true
 		types = append(types, map[string]interface{}{
 			"id":   id,
 			"name": name,

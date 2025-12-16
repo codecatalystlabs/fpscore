@@ -68,7 +68,14 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // Load health worker performance
+let isLoadingPerformance = false;
 async function loadPerformance(healthWorkerId) {
+    // Prevent concurrent calls
+    if (isLoadingPerformance) {
+        return;
+    }
+    
+    isLoadingPerformance = true;
     try {
         const startDate = document.getElementById('startDate').value;
         const endDate = document.getElementById('endDate').value;
@@ -92,9 +99,19 @@ async function loadPerformance(healthWorkerId) {
 
         const data = await response.json();
         const hw = data.healthWorker;
-        const thematicScores = data.thematicScores;
+        let thematicScores = data.thematicScores || [];
         const avgScore = data.averageScore;
         const assessedCount = data.assessedCount;
+
+        // Deduplicate thematic scores by id
+        const seenIds = new Set();
+        thematicScores = thematicScores.filter(score => {
+            if (seenIds.has(score.id)) {
+                return false;
+            }
+            seenIds.add(score.id);
+            return true;
+        });
 
         // Update health worker info
         document.getElementById('healthWorkerName').textContent = hw.fullName;
@@ -192,6 +209,8 @@ async function loadPerformance(healthWorkerId) {
     } catch (error) {
         console.error('Error loading performance:', error);
         alert(`Error loading performance data: ${error.message || 'Unknown error'}`);
+    } finally {
+        isLoadingPerformance = false;
     }
 }
 

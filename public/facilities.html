@@ -395,10 +395,17 @@
             }
         }
 
+        let isLoadingFacilityAssessments = false;
         async function loadFacilityAssessments(facilityId, facilityName) {
+            // Prevent concurrent calls
+            if (isLoadingFacilityAssessments) {
+                return;
+            }
+            
             const wrapper = document.getElementById('facilityAssessmentsWrapper');
             if (!wrapper) return;
 
+            isLoadingFacilityAssessments = true;
             wrapper.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div></div>';
 
             try {
@@ -418,7 +425,17 @@
                     return;
                 }
 
-                const rows = assessments.map(a => {
+                // Deduplicate assessments by id
+                const seenIds = new Set();
+                const uniqueAssessments = assessments.filter(a => {
+                    if (seenIds.has(a.id)) {
+                        return false;
+                    }
+                    seenIds.add(a.id);
+                    return true;
+                });
+
+                const rows = uniqueAssessments.map(a => {
                     const percentage = a.percentage !== undefined
                         ? parseFloat(a.percentage).toFixed(1)
                         : (a.percentageScore !== undefined ? parseFloat(a.percentageScore).toFixed(1) : '0.0');
@@ -454,18 +471,39 @@
             } catch (error) {
                 console.error('Failed to load facility assessments:', error);
                 wrapper.innerHTML = `<div class="alert alert-danger">Error loading assessments: ${error.message}</div>`;
+            } finally {
+                isLoadingFacilityAssessments = false;
             }
         }
 
+        let isLoadingFilterRegions = false;
         async function loadFilterRegions() {
+            // Prevent concurrent calls
+            if (isLoadingFilterRegions) {
+                return;
+            }
+            
             const regionSelect = document.getElementById('filterRegion');
             if (!regionSelect) return;
+            
+            isLoadingFilterRegions = true;
             try {
                 const response = await fetch(`${API_BASE}/regions`, { headers: getAuthHeaders(null) });
                 if (!response.ok) throw new Error('Failed to load regions');
                 const regions = await response.json();
+                
+                // Deduplicate regions by id
+                const seenIds = new Set();
+                const uniqueRegions = regions.filter(region => {
+                    if (seenIds.has(region.id)) {
+                        return false;
+                    }
+                    seenIds.add(region.id);
+                    return true;
+                });
+                
                 regionSelect.innerHTML = '<option value="">All Regions</option>';
-                regions.forEach(region => {
+                uniqueRegions.forEach(region => {
                     const opt = document.createElement('option');
                     opt.value = region.id;
                     opt.textContent = region.name;
@@ -474,18 +512,39 @@
             } catch (error) {
                 console.error('Error loading regions:', error);
                 regionSelect.innerHTML = '<option value="">Failed to load regions</option>';
+            } finally {
+                isLoadingFilterRegions = false;
             }
         }
 
+        let isLoadingFormRegions = false;
         async function loadFormRegions() {
+            // Prevent concurrent calls
+            if (isLoadingFormRegions) {
+                return;
+            }
+            
             const regionSelect = document.getElementById('formRegion');
             if (!regionSelect) return;
+            
+            isLoadingFormRegions = true;
             try {
                 const response = await fetch(`${API_BASE}/regions`, { headers: getAuthHeaders(null) });
                 if (!response.ok) throw new Error('Failed to load regions');
                 const regions = await response.json();
+                
+                // Deduplicate regions by id
+                const seenIds = new Set();
+                const uniqueRegions = regions.filter(region => {
+                    if (seenIds.has(region.id)) {
+                        return false;
+                    }
+                    seenIds.add(region.id);
+                    return true;
+                });
+                
                 regionSelect.innerHTML = '<option value="">Select Region</option>';
-                regions.forEach(region => {
+                uniqueRegions.forEach(region => {
                     const opt = document.createElement('option');
                     opt.value = region.id;
                     opt.textContent = region.name;
@@ -494,6 +553,8 @@
             } catch (error) {
                 console.error('Error loading regions:', error);
                 regionSelect.innerHTML = '<option value="">Failed to load regions</option>';
+            } finally {
+                isLoadingFormRegions = false;
             }
         }
 

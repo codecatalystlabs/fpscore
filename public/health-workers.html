@@ -288,7 +288,14 @@
             }
         }
 
+        let isLoadingHealthWorkers = false;
         async function loadHealthWorkers() {
+            // Prevent concurrent calls
+            if (isLoadingHealthWorkers) {
+                return;
+            }
+            
+            isLoadingHealthWorkers = true;
             try {
                 const params = new URLSearchParams();
                 const regionId = document.getElementById('filterRegion').value;
@@ -302,14 +309,24 @@
                 const response = await fetch(`${API_BASE}/health-workers?${params.toString()}`, { headers: getAuthHeaders() });
                 const healthWorkers = await response.json();
                 
+                // Deduplicate by id
+                const seenIds = new Set();
+                const uniqueHealthWorkers = healthWorkers.filter(hw => {
+                    if (seenIds.has(hw.id)) {
+                        return false;
+                    }
+                    seenIds.add(hw.id);
+                    return true;
+                });
+                
                 const tbody = document.getElementById('healthWorkersTable');
-                if (healthWorkers.length === 0) {
+                if (uniqueHealthWorkers.length === 0) {
                     tbody.innerHTML = '<tr><td colspan="7" class="text-center">No health workers found</td></tr>';
                     return;
                 }
                 
                 tbody.innerHTML = '';
-                for (const hw of healthWorkers) {
+                for (const hw of uniqueHealthWorkers) {
                     // Get facility hierarchy
                     const facilityHierarchy = await getFacilityHierarchy(hw.facilityId);
                     

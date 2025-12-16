@@ -135,7 +135,18 @@ async function loadAssessment(assessmentId) {
         const thematicContainer = document.getElementById('thematicScoresContainer');
         if (thematicContainer) {
             thematicContainer.innerHTML = '';
-            thematicScores.forEach(score => {
+            
+            // Deduplicate thematic scores by id
+            const seenIds = new Set();
+            const uniqueThematicScores = thematicScores.filter(score => {
+                if (seenIds.has(score.id)) {
+                    return false;
+                }
+                seenIds.add(score.id);
+                return true;
+            });
+            
+            uniqueThematicScores.forEach(score => {
             const div = document.createElement('div');
             div.className = 'thematic-score';
             const progressClass = score.percentage >= 90 ? 'success' : 
@@ -164,9 +175,22 @@ async function loadAssessment(assessmentId) {
         }
         responsesAccordion.innerHTML = '';
         
+        // Deduplicate responses by question id, then group by thematic area
+        const seenQuestionIds = new Set();
+        const uniqueResponses = responses.filter(response => {
+            const questionId = response.questionId || response.question_id;
+            if (questionId && seenQuestionIds.has(questionId)) {
+                return false;
+            }
+            if (questionId) {
+                seenQuestionIds.add(questionId);
+            }
+            return true;
+        });
+        
         // Group responses by thematic area
         const responsesByArea = {};
-        responses.forEach(response => {
+        uniqueResponses.forEach(response => {
             const areaId = response.thematicAreaId;
             if (!responsesByArea[areaId]) {
                 responsesByArea[areaId] = {

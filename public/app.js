@@ -364,7 +364,17 @@ function setupCascadingDropdowns() {
 }
 
 // Load assessment types
+let isLoadingAssessmentTypes = false;
 async function loadAssessmentTypes() {
+    // Prevent concurrent calls
+    if (isLoadingAssessmentTypes) {
+        return;
+    }
+    
+    const container = document.getElementById('assessmentTypesContainer');
+    if (!container) return;
+    
+    isLoadingAssessmentTypes = true;
     try {
         const token = localStorage.getItem('token');
         const headers = {};
@@ -375,20 +385,26 @@ async function loadAssessmentTypes() {
         if (!response.ok) {
             if (response.status === 403) {
                 console.error('Permission denied: You do not have permission to view assessment types');
-                const container = document.getElementById('assessmentTypesContainer');
-                if (container) {
-                    container.innerHTML = '<div class="alert alert-warning">You do not have permission to view assessment types. Please contact your administrator.</div>';
-                }
+                container.innerHTML = '<div class="alert alert-warning">You do not have permission to view assessment types. Please contact your administrator.</div>';
                 return;
             }
             throw new Error('Failed to load assessment types');
         }
         const types = await response.json();
-        const container = document.getElementById('assessmentTypesContainer');
-        if (!container) return;
+        
+        // Deduplicate by id to prevent showing duplicates
+        const seenIds = new Set();
+        const uniqueTypes = types.filter(type => {
+            if (seenIds.has(type.id)) {
+                return false;
+            }
+            seenIds.add(type.id);
+            return true;
+        });
+        
         container.innerHTML = '';
         
-        types.forEach(type => {
+        uniqueTypes.forEach(type => {
             const col = document.createElement('div');
             col.className = 'col-md-6 col-lg-4 mb-3';
             col.innerHTML = `
@@ -423,17 +439,26 @@ async function loadAssessmentTypes() {
         });
     } catch (error) {
         console.error('Error loading assessment types:', error);
+    } finally {
+        isLoadingAssessmentTypes = false;
     }
 }
 
 // Load health workers with assessments for history
+let isLoadingAssessments = false;
 async function loadAssessments() {
+    // Prevent concurrent calls
+    if (isLoadingAssessments) {
+        return;
+    }
+    
     const container = document.getElementById('assessmentsList');
     if (!container) {
         console.error('assessmentsList container not found');
         return;
     }
 
+    isLoadingAssessments = true;
     try {
         const token = localStorage.getItem('token');
         const headers = {};
@@ -469,7 +494,17 @@ async function loadAssessments() {
         }
         const healthWorkers = await response.json();
         
-        if (healthWorkers.length === 0) {
+        // Deduplicate by id
+        const seenIds = new Set();
+        const uniqueHealthWorkers = healthWorkers.filter(hw => {
+            if (seenIds.has(hw.id)) {
+                return false;
+            }
+            seenIds.add(hw.id);
+            return true;
+        });
+        
+        if (uniqueHealthWorkers.length === 0) {
             container.innerHTML = '<p class="text-center text-muted">No health workers with assessments found.</p>';
             return;
         }
@@ -477,7 +512,7 @@ async function loadAssessments() {
         container.innerHTML = '<div class="table-responsive"><table class="table table-hover"><thead><tr><th>Health Worker</th><th>Email</th><th>Phone</th><th>Facility</th><th>Region</th><th>District</th><th>Subcounty</th><th>Assessments</th><th>First Assessment</th><th>Last Assessment</th><th>Actions</th></tr></thead><tbody></tbody></table></div>';
         const tbody = container.querySelector('tbody');
 
-        healthWorkers.forEach(hw => {
+        uniqueHealthWorkers.forEach(hw => {
             const row = document.createElement('tr');
             const firstDate = hw.firstAssessment ? new Date(hw.firstAssessment).toLocaleDateString() : 'N/A';
             const lastDate = hw.lastAssessment ? new Date(hw.lastAssessment).toLocaleDateString() : 'N/A';
@@ -520,5 +555,7 @@ async function loadAssessments() {
         if (container) {
             container.innerHTML = `<div class="alert alert-danger">Error loading health workers: ${error.message || 'Unknown error'}. Please try again or contact support.</div>`;
         }
+    } finally {
+        isLoadingAssessments = false;
     }
 }

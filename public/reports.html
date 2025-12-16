@@ -132,32 +132,75 @@
             }
         }
 
+        let isLoadingFilters = false;
         async function loadFilters() {
-            const [regions, types] = await Promise.all([
-                fetch(`${API_BASE}/regions`, {headers: getAuthHeaders()}).then(r=>r.json()),
-                fetch(`${API_BASE}/assessment-types`, {headers: getAuthHeaders()}).then(r=>r.json()),
-            ]);
-            const regionSelect = document.getElementById('filterRegion');
-            if (regionSelect) {
-                // Check if this dropdown is restricted - if so, don't clear it
-                const isRestricted = regionSelect.disabled && regionSelect.classList.contains('bg-light');
-                if (!isRestricted) {
-                    // Only add if not restricted
-                    const existingValues = Array.from(regionSelect.options).map(opt => opt.value);
-                    regions.forEach(r => {
-                        if (!existingValues.includes(String(r.id))) {
-                            const opt = document.createElement('option');
-                            opt.value = r.id; opt.textContent = r.name;
-                            regionSelect.appendChild(opt);
-                        }
+            // Prevent concurrent calls
+            if (isLoadingFilters) {
+                return;
+            }
+            
+            isLoadingFilters = true;
+            try {
+                const [regions, types] = await Promise.all([
+                    fetch(`${API_BASE}/regions`, {headers: getAuthHeaders()}).then(r=>r.json()),
+                    fetch(`${API_BASE}/assessment-types`, {headers: getAuthHeaders()}).then(r=>r.json()),
+                ]);
+                
+                // Deduplicate regions by id
+                const seenRegionIds = new Set();
+                const uniqueRegions = regions.filter(r => {
+                    if (seenRegionIds.has(r.id)) {
+                        return false;
+                    }
+                    seenRegionIds.add(r.id);
+                    return true;
+                });
+                
+                // Deduplicate types by id
+                const seenTypeIds = new Set();
+                const uniqueTypes = types.filter(t => {
+                    if (seenTypeIds.has(t.id)) {
+                        return false;
+                    }
+                    seenTypeIds.add(t.id);
+                    return true;
+                });
+                
+                const regionSelect = document.getElementById('filterRegion');
+                if (regionSelect) {
+                    // Check if this dropdown is restricted - if so, don't clear it
+                    const isRestricted = regionSelect.disabled && regionSelect.classList.contains('bg-light');
+                    if (!isRestricted) {
+                        // Only add if not restricted
+                        const existingValues = Array.from(regionSelect.options).map(opt => opt.value);
+                        uniqueRegions.forEach(r => {
+                            if (!existingValues.includes(String(r.id))) {
+                                const opt = document.createElement('option');
+                                opt.value = r.id; opt.textContent = r.name;
+                                regionSelect.appendChild(opt);
+                            }
+                        });
+                    }
+                }
+                
+                const typeSelect = document.getElementById('filterAssessmentType');
+                if (typeSelect) {
+                    // Clear existing options except the first one (if it's "All" or empty)
+                    const firstOption = typeSelect.options[0];
+                    typeSelect.innerHTML = '';
+                    if (firstOption && (!firstOption.value || firstOption.value === '')) {
+                        typeSelect.appendChild(firstOption);
+                    }
+                    
+                    uniqueTypes.forEach(t => {
+                        const opt = document.createElement('option');
+                        opt.value = t.id; opt.textContent = t.name;
+                        typeSelect.appendChild(opt);
                     });
                 }
+            } finally {
+                isLoadingFilters = false;
             }
-            types.forEach(t => {
-                const opt = document.createElement('option');
-                opt.value = t.id; opt.textContent = t.name;
-                document.getElementById('filterAssessmentType').appendChild(opt);
-            });
         }
 
         document.getElementById('filterRegion').addEventListener('change', async function() {
@@ -173,8 +216,19 @@
                 return; 
             }
             const districts = await fetch(`${API_BASE}/districts/${regionId}`, {headers: getAuthHeaders()}).then(r=>r.json());
+            
+            // Deduplicate districts by id
+            const seenDistrictIds = new Set();
+            const uniqueDistricts = districts.filter(d => {
+                if (seenDistrictIds.has(d.id)) {
+                    return false;
+                }
+                seenDistrictIds.add(d.id);
+                return true;
+            });
+            
             select.innerHTML = '<option value="">All Districts</option>';
-            districts.forEach(d => { const opt = document.createElement('option'); opt.value=d.id; opt.textContent=d.name; select.appendChild(opt); });
+            uniqueDistricts.forEach(d => { const opt = document.createElement('option'); opt.value=d.id; opt.textContent=d.name; select.appendChild(opt); });
             select.disabled = false;
         });
 
@@ -190,14 +244,30 @@
             }
             // Get subcounties first, then facilities
             const subcounties = await fetch(`${API_BASE}/subcounties/${districtId}`, {headers: getAuthHeaders()}).then(r=>r.json());
+            
+            // Deduplicate subcounties by id
+            const seenSubcountyIds = new Set();
+            const uniqueSubcounties = subcounties.filter(s => {
+                if (seenSubcountyIds.has(s.id)) {
+                    return false;
+                }
+                seenSubcountyIds.add(s.id);
+                return true;
+            });
+            
             select.innerHTML = '<option value="">All Facilities</option>';
-            for (const subcounty of subcounties) {
+            const seenFacilityIds = new Set();
+            for (const subcounty of uniqueSubcounties) {
                 const facilities = await fetch(`${API_BASE}/facilities/${subcounty.id}`, {headers: getAuthHeaders()}).then(r=>r.json());
                 facilities.forEach(f => {
-                    const opt = document.createElement('option');
-                    opt.value = f.id;
-                    opt.textContent = f.name;
-                    select.appendChild(opt);
+                    // Deduplicate facilities
+                    if (!seenFacilityIds.has(f.id)) {
+                        seenFacilityIds.add(f.id);
+                        const opt = document.createElement('option');
+                        opt.value = f.id;
+                        opt.textContent = f.name;
+                        select.appendChild(opt);
+                    }
                 });
             }
             select.disabled = false;
@@ -212,8 +282,19 @@
                 return; 
             }
             const healthWorkers = await fetch(`${API_BASE}/health-workers?facilityId=${facilityId}`, {headers: getAuthHeaders()}).then(r=>r.json());
+            
+            // Deduplicate health workers by id
+            const seenHwIds = new Set();
+            const uniqueHealthWorkers = healthWorkers.filter(hw => {
+                if (seenHwIds.has(hw.id)) {
+                    return false;
+                }
+                seenHwIds.add(hw.id);
+                return true;
+            });
+            
             select.innerHTML = '<option value="">All Health Workers</option>';
-            healthWorkers.forEach(hw => {
+            uniqueHealthWorkers.forEach(hw => {
                 const opt = document.createElement('option');
                 opt.value = hw.id;
                 opt.textContent = hw.fullName + (hw.email ? ` (${hw.email})` : '');
@@ -226,8 +307,19 @@
             const typeId = this.value; const select = document.getElementById('filterThematicArea');
             if (!typeId) { select.innerHTML = '<option value="">All Areas</option>'; select.disabled = true; return; }
             const areas = await fetch(`${API_BASE}/assessment-types/${typeId}/thematic-areas`, {headers: getAuthHeaders()}).then(r=>r.json());
+            
+            // Deduplicate areas by id
+            const seenAreaIds = new Set();
+            const uniqueAreas = areas.filter(a => {
+                if (seenAreaIds.has(a.id)) {
+                    return false;
+                }
+                seenAreaIds.add(a.id);
+                return true;
+            });
+            
             select.innerHTML = '<option value="">All Areas</option>';
-            areas.forEach(a => { const opt=document.createElement('option'); opt.value=a.id; opt.textContent=a.name; select.appendChild(opt); });
+            uniqueAreas.forEach(a => { const opt=document.createElement('option'); opt.value=a.id; opt.textContent=a.name; select.appendChild(opt); });
             select.disabled = false;
         });
 

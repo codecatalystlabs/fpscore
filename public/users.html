@@ -141,20 +141,42 @@
         function getAuthHeaders() { return {'Authorization': 'Bearer ' + localStorage.getItem('token'), 'Content-Type': 'application/json'}; }
         function logout() { localStorage.clear(); window.location.href='/'; }
 
+        let isLoadingUsers = false;
         async function loadUsers() {
-            const resp = await fetch(`${API_BASE}/users`, {headers: getAuthHeaders()});
-            const data = await resp.json();
-            const tbody = document.getElementById('usersBody');
-            tbody.innerHTML = data.map(u=>`<tr>
-                <td>${u.name}</td>
-                <td>${u.email}</td>
-                <td><span class="badge ${u.isActive ? 'bg-success' : 'bg-secondary'}">${u.isActive?'Active':'Inactive'}</span></td>
-                <td>${new Date(u.createdAt).toLocaleDateString()}</td>
-                <td>
-                    <button class="btn btn-sm btn-outline-primary me-1" onclick="editUser(${u.id})"><i class="bi bi-pencil"></i></button>
-                    <button class="btn btn-sm btn-outline-danger" onclick="deleteUser(${u.id})"><i class="bi bi-trash"></i></button>
-                </td>
-            </tr>`).join('');
+            // Prevent concurrent calls
+            if (isLoadingUsers) {
+                return;
+            }
+            
+            isLoadingUsers = true;
+            try {
+                const resp = await fetch(`${API_BASE}/users`, {headers: getAuthHeaders()});
+                const data = await resp.json();
+                
+                // Deduplicate users by id
+                const seenIds = new Set();
+                const uniqueUsers = data.filter(u => {
+                    if (seenIds.has(u.id)) {
+                        return false;
+                    }
+                    seenIds.add(u.id);
+                    return true;
+                });
+                
+                const tbody = document.getElementById('usersBody');
+                tbody.innerHTML = uniqueUsers.map(u=>`<tr>
+                    <td>${u.name}</td>
+                    <td>${u.email}</td>
+                    <td><span class="badge ${u.isActive ? 'bg-success' : 'bg-secondary'}">${u.isActive?'Active':'Inactive'}</span></td>
+                    <td>${new Date(u.createdAt).toLocaleDateString()}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary me-1" onclick="editUser(${u.id})"><i class="bi bi-pencil"></i></button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteUser(${u.id})"><i class="bi bi-trash"></i></button>
+                    </td>
+                </tr>`).join('');
+            } finally {
+                isLoadingUsers = false;
+            }
         }
 
         async function openUserModal() {

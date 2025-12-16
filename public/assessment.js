@@ -81,7 +81,14 @@ async function loadHealthWorkerInfo() {
 }
 
 // Load thematic areas and questions
+let isLoadingThematicAreas = false;
 async function loadThematicAreas() {
+    // Prevent concurrent calls
+    if (isLoadingThematicAreas) {
+        return;
+    }
+    
+    isLoadingThematicAreas = true;
     try {
         const response = await fetch(`${API_BASE}/assessment-types/${assessmentData.typeId}/thematic-areas`, { headers: getAuthHeaders(null) });
         if (!response.ok) {
@@ -105,7 +112,17 @@ async function loadThematicAreas() {
             throw new Error('Invalid response format: expected array of thematic areas');
         }
         
-        assessmentData.thematicAreas = thematicAreas;
+        // Deduplicate by id
+        const seenIds = new Set();
+        const uniqueThematicAreas = thematicAreas.filter(area => {
+            if (seenIds.has(area.id)) {
+                return false;
+            }
+            seenIds.add(area.id);
+            return true;
+        });
+        
+        assessmentData.thematicAreas = uniqueThematicAreas;
         
         const accordion = document.getElementById('thematicAreasAccordion');
         if (!accordion) {
@@ -113,8 +130,8 @@ async function loadThematicAreas() {
         }
         accordion.innerHTML = '';
         
-        for (let i = 0; i < thematicAreas.length; i++) {
-            const area = thematicAreas[i];
+        for (let i = 0; i < uniqueThematicAreas.length; i++) {
+            const area = uniqueThematicAreas[i];
             const questions = await loadQuestions(area.id);
             // Ensure questions is always an array
             area.questions = Array.isArray(questions) ? questions : [];
@@ -130,6 +147,8 @@ async function loadThematicAreas() {
         assessmentData.thematicAreas = [];
         alert(`Error loading assessment data: ${error.message || 'Unknown error'}. Please try again.`);
         // Don't call updateProgress on error - it will show 0% which is misleading
+    } finally {
+        isLoadingThematicAreas = false;
     }
 }
 
@@ -151,6 +170,18 @@ async function loadQuestions(thematicAreaId) {
             throw new Error(errorMsg);
         }
         const questions = await response.json();
+        
+        // Deduplicate by id
+        if (Array.isArray(questions)) {
+            const seenIds = new Set();
+            return questions.filter(q => {
+                if (seenIds.has(q.id)) {
+                    return false;
+                }
+                seenIds.add(q.id);
+                return true;
+            });
+        }
         return questions;
     } catch (error) {
         console.error('Error loading questions:', error);
