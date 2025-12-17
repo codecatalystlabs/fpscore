@@ -55,6 +55,11 @@ async function loadNavigation() {
 }
 
 function logout() {
+    if (window.EventLogger) {
+        window.EventLogger.log('auth', 'logout', {
+            timestamp: new Date().toISOString()
+        });
+    }
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     window.location.href = '/';

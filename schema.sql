@@ -193,3 +193,22 @@ CREATE TABLE IF NOT EXISTS user_admin_areas (
 INSERT INTO roles (name, description) VALUES ('Admin', 'System administrator')
 ON CONFLICT (name) DO NOTHING;
 
+-- Events/Logs table
+CREATE TABLE IF NOT EXISTS events (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    session_id VARCHAR(255),
+    category VARCHAR(50) NOT NULL, -- 'page', 'interaction', 'form', 'api', 'assessment', 'navigation', 'error', 'auth', 'application', 'filter', 'performance'
+    event_type VARCHAR(100) NOT NULL, -- Specific event name
+    page VARCHAR(255),
+    data JSONB,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Indexes for events table
+CREATE INDEX IF NOT EXISTS idx_events_user_id ON events(user_id);
+CREATE INDEX IF NOT EXISTS idx_events_category ON events(category);
+CREATE INDEX IF NOT EXISTS idx_events_event_type ON events(event_type);
+CREATE INDEX IF NOT EXISTS idx_events_created_at ON events(created_at);
+CREATE INDEX IF NOT EXISTS idx_events_session_id ON events(session_id);
+

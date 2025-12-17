@@ -29,6 +29,15 @@ document.addEventListener('DOMContentLoaded', function() {
     currentHealthWorkerId = urlParams.get('id');
     const startDate = urlParams.get('startDate');
     const endDate = urlParams.get('endDate');
+    
+    if (window.EventLogger) {
+        window.EventLogger.log('performance', 'page_load', {
+            healthWorkerId: currentHealthWorkerId,
+            startDate: startDate,
+            endDate: endDate,
+            timestamp: new Date().toISOString()
+        });
+    }
 
     if (!currentHealthWorkerId) {
         alert('No health worker ID provided');
@@ -202,6 +211,15 @@ async function loadPerformance(healthWorkerId) {
             `;
             // Add click handler
             div.addEventListener('click', function() {
+                if (window.EventLogger) {
+                    window.EventLogger.log('performance', 'thematic_area_click', {
+                        healthWorkerId: currentHealthWorkerId,
+                        thematicAreaId: score.id,
+                        thematicAreaName: score.name,
+                        percentage: score.percentage,
+                        timestamp: new Date().toISOString()
+                    });
+                }
                 loadThematicAreaDetails(currentHealthWorkerId, score.id);
             });
             container.appendChild(div);

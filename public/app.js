@@ -2,6 +2,14 @@
 
 const API_BASE = '/api';
 
+// Log application initialization
+if (window.EventLogger) {
+    window.EventLogger.log('application', 'init', {
+        page: 'home',
+        timestamp: new Date().toISOString()
+    });
+}
+
 function getAuthHeaders(contentType = 'application/json') {
     const headers = {};
     const token = localStorage.getItem('token');
@@ -16,6 +24,12 @@ function getAuthHeaders(contentType = 'application/json') {
 
 // Load regions on page load
 document.addEventListener('DOMContentLoaded', function() {
+    if (window.EventLogger) {
+        window.EventLogger.log('application', 'dom_ready', {
+            page: 'home',
+            timestamp: new Date().toISOString()
+        });
+    }
     loadRegions();
     loadAssessmentTypes();
     setupCascadingDropdowns();
@@ -105,6 +119,12 @@ function setupCascadingDropdowns() {
 
     regionSelect.addEventListener('change', async function() {
         const regionId = this.value;
+        if (window.EventLogger) {
+            window.EventLogger.log('filter', 'region_change', {
+                regionId: regionId,
+                timestamp: new Date().toISOString()
+            });
+        }
         if (regionId) {
             districtSelect.disabled = false;
             districtSelect.innerHTML = '<option value="">Loading...</option>';
@@ -148,6 +168,12 @@ function setupCascadingDropdowns() {
 
     districtSelect.addEventListener('change', async function() {
         const districtId = this.value;
+        if (window.EventLogger) {
+            window.EventLogger.log('filter', 'district_change', {
+                districtId: districtId,
+                timestamp: new Date().toISOString()
+            });
+        }
         if (districtId) {
             if (subcountySelect) {
                 subcountySelect.disabled = false;
@@ -426,6 +452,12 @@ async function loadAssessmentTypes() {
                 // Get selected health worker from the search/selection
                 if (!selectedHealthWorker) {
                     alert('Please select a health worker first');
+                    if (window.EventLogger) {
+                        window.EventLogger.log('assessment', 'start_failed', {
+                            reason: 'no_health_worker_selected',
+                            timestamp: new Date().toISOString()
+                        });
+                    }
                     return;
                 }
                 
@@ -434,6 +466,18 @@ async function loadAssessmentTypes() {
                 const facilityName = selectedHealthWorker.facilityName;
                 const typeId = this.dataset.typeId;
                 const typeCode = this.dataset.typeCode;
+                
+                if (window.EventLogger) {
+                    window.EventLogger.log('assessment', 'start', {
+                        typeId: typeId,
+                        typeCode: typeCode,
+                        healthWorkerId: healthWorkerId,
+                        facilityId: facilityId,
+                        facilityName: facilityName,
+                        timestamp: new Date().toISOString()
+                    });
+                }
+                
                 window.location.href = `assessment.html?typeId=${typeId}&healthWorkerId=${healthWorkerId}&facilityId=${facilityId}&facilityName=${encodeURIComponent(facilityName)}&typeCode=${typeCode}`;
             });
         });
@@ -546,6 +590,16 @@ async function loadAssessments() {
                 const params = new URLSearchParams();
                 if (startDate) params.append('startDate', startDate);
                 if (endDate) params.append('endDate', endDate);
+                
+                if (window.EventLogger) {
+                    window.EventLogger.log('navigation', 'view_performance', {
+                        healthWorkerId: healthWorkerId,
+                        startDate: startDate,
+                        endDate: endDate,
+                        timestamp: new Date().toISOString()
+                    });
+                }
+                
                 window.location.href = `health-worker-performance.html?id=${healthWorkerId}&${params.toString()}`;
             });
         });

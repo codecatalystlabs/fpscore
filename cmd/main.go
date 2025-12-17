@@ -8,6 +8,7 @@ import (
 	"fpscore/config"
 	"fpscore/database"
 	"fpscore/handlers"
+	"fpscore/middleware"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
@@ -43,6 +44,9 @@ func main() {
 	// Middleware
 	app.Use(logger.New())
 	app.Use(cors.New())
+
+	// API Logger middleware (logs all API calls to database)
+	app.Use("/api", middleware.APILogger())
 
 	// Get project root directory (where go.mod is located)
 	// This works whether running from project root or cmd directory
@@ -93,6 +97,7 @@ func main() {
 	// Public routes (no auth required)
 	app.Post("/api/auth/login", handlers.Login)
 	app.Post("/api/auth/bootstrap", handlers.BootstrapAdmin)
+	app.Post("/api/events/log", handlers.SaveEvent) // Allow saving events without auth (for pre-login events)
 
 	// API routes (auth required)
 	api := app.Group("/api", handlers.AuthMiddleware)
@@ -163,6 +168,11 @@ func main() {
 	// Reports
 	api.Get("/reports/assessments/pdf", handlers.CheckPermission("reports.export"), handlers.ExportAssessmentsPDF)
 	api.Get("/reports/assessments/xls", handlers.CheckPermission("reports.export"), handlers.ExportAssessmentsXLS)
+
+	// Events/Logs routes (viewing requires auth and permission)
+	api.Get("/events", handlers.CheckPermission("logs.view"), handlers.GetEvents)
+	api.Get("/events/categories", handlers.CheckPermission("logs.view"), handlers.GetEventCategories)
+	api.Get("/events/types", handlers.CheckPermission("logs.view"), handlers.GetEventTypes)
 
 	log.Printf("Server starting on port %s", cfg.Port)
 	log.Fatal(app.Listen(":" + cfg.Port))

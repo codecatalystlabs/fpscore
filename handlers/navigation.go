@@ -101,5 +101,14 @@ func GetNavigationItems(c *fiber.Ctx) error {
 		})
 	}
 
+	// Logs - needs logs.view
+	if hasPermission("logs.view") {
+		items = append(items, NavigationItem{
+			Label: "System Logs",
+			URL:   "logs.html",
+			Icon:  "bi-journal-text",
+		})
+	}
+
 	return c.JSON(items)
 }

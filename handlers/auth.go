@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"fpscore/database"
+	"fpscore/helpers"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/golang-jwt/jwt/v5"
@@ -56,6 +57,10 @@ func Login(c *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
+
+	// Log successful login
+	helpers.LogLogin(id, name, c.IP())
+
 	return c.JSON(fiber.Map{"token": signed, "user": fiber.Map{"id": id, "name": name, "email": email}})
 }
 

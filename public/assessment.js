@@ -29,6 +29,15 @@ document.addEventListener('DOMContentLoaded', function() {
     assessmentData.facilityId = urlParams.get('facilityId');
     assessmentData.facilityName = decodeURIComponent(urlParams.get('facilityName') || '');
     
+    if (window.EventLogger) {
+        window.EventLogger.log('assessment', 'page_load', {
+            typeId: assessmentData.typeId,
+            healthWorkerId: assessmentData.healthWorkerId,
+            facilityId: assessmentData.facilityId,
+            timestamp: new Date().toISOString()
+        });
+    }
+    
     document.getElementById('facilityName').textContent = assessmentData.facilityName;
     document.getElementById('assessmentTypeName').textContent = urlParams.get('typeCode') || '';
     document.getElementById('assessmentTypeDisplay').textContent = urlParams.get('typeCode') || '';
@@ -228,6 +237,15 @@ function createThematicAreaAccordion(area, index) {
             const response = this.dataset.response;
             assessmentData.responses[questionId] = response;
             
+            if (window.EventLogger) {
+                window.EventLogger.log('assessment', 'question_response', {
+                    questionId: questionId,
+                    response: response,
+                    thematicAreaId: area.id,
+                    timestamp: new Date().toISOString()
+                });
+            }
+            
             // Update button states
             this.parentElement.querySelectorAll('.response-btn').forEach(b => b.classList.remove('active'));
             this.classList.add('active');
@@ -372,9 +390,24 @@ function updateProgress() {
 
 // Submit assessment
 async function submitAssessment() {
+    if (window.EventLogger) {
+        window.EventLogger.log('assessment', 'submit_start', {
+            typeId: assessmentData.typeId,
+            healthWorkerId: assessmentData.healthWorkerId,
+            responseCount: Object.keys(assessmentData.responses).length,
+            timestamp: new Date().toISOString()
+        });
+    }
+    
     // Ensure thematicAreas is loaded
     if (!assessmentData.thematicAreas || !Array.isArray(assessmentData.thematicAreas) || assessmentData.thematicAreas.length === 0) {
         alert('Assessment data is not loaded. Please refresh the page and try again.');
+        if (window.EventLogger) {
+            window.EventLogger.log('assessment', 'submit_failed', {
+                reason: 'data_not_loaded',
+                timestamp: new Date().toISOString()
+            });
+        }
         return;
     }
     
@@ -395,6 +428,13 @@ async function submitAssessment() {
 
     if (mandatoryUnanswered > 0) {
         alert(`Please answer all mandatory questions (${mandatoryUnanswered} remaining). Mandatory questions are weight > 2.`);
+        if (window.EventLogger) {
+            window.EventLogger.log('assessment', 'submit_failed', {
+                reason: 'mandatory_questions_unanswered',
+                count: mandatoryUnanswered,
+                timestamp: new Date().toISOString()
+            });
+        }
         return;
     }
     
@@ -435,10 +475,28 @@ async function submitAssessment() {
         }
         
         const result = await response.json();
+        
+        if (window.EventLogger) {
+            window.EventLogger.log('assessment', 'submit_success', {
+                assessmentId: result.id,
+                percentage: result.percentage,
+                performanceLevel: result.performanceLevel,
+                timestamp: new Date().toISOString()
+            });
+        }
+        
         alert(`Assessment submitted successfully!\nScore: ${result.percentage.toFixed(1)}% - ${result.performanceLevel}`);
         window.location.href = `view-assessment.html?id=${result.id}`;
     } catch (error) {
         console.error('Error submitting assessment:', error);
+        
+        if (window.EventLogger) {
+            window.EventLogger.log('assessment', 'submit_error', {
+                error: error.message,
+                timestamp: new Date().toISOString()
+            });
+        }
+        
         alert('Error submitting assessment. Please try again.');
         submitBtn.disabled = false;
         submitBtn.innerHTML = '<i class="bi bi-check-circle"></i> Submit Assessment';

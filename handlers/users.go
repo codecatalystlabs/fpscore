@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"fpscore/database"
+	"fpscore/helpers"
 	"fpscore/models"
 
 	"github.com/gofiber/fiber/v2"
@@ -196,6 +197,10 @@ func CreateUser(c *fiber.Ctx) error {
 	if err = tx.Commit(); err != nil {
 		return err
 	}
+
+	// Log user creation
+	currentUserID := c.Locals("userID")
+	helpers.LogCreate(currentUserID, "User", req.Name, userID)
 
 	return c.JSON(fiber.Map{"id": userID, "message": "User created successfully"})
 }
