@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -56,12 +55,6 @@ func APILogger() fiber.Handler {
 			queryParams[string(key)] = string(value)
 		})
 
-		// Capture response by creating a buffer
-		var responseBody bytes.Buffer
-		c.Response().SetBodyStreamWriter(func(w *bytes.Buffer) {
-			responseBody = *w
-		})
-
 		// Execute the handler
 		err := c.Next()
 
@@ -81,6 +74,8 @@ func APILogger() fiber.Handler {
 			"ip":          ip,
 			"user_agent":  userAgent,
 			"success":     success,
+			"entity_type": entityType,
+			"description": description,
 		}
 
 		if len(queryParams) > 0 {
@@ -96,26 +91,11 @@ func APILogger() fiber.Handler {
 			logData["error"] = err.Error()
 		}
 
-		// Determine event category and type
-		category := "api"
-		eventType := fmt.Sprintf("%s %s", method, path)
+		// Determine event category, type, and entity
+		category, eventType, entityType := categorizeEndpoint(path, method)
 
-		// More specific event types based on the endpoint
-		if path == "/api/auth/login" {
-			category = "auth"
-			eventType = "login"
-		} else if path == "/api/auth/logout" {
-			category = "auth"
-			eventType = "logout"
-		} else if method == "POST" {
-			eventType = "create"
-		} else if method == "PUT" || method == "PATCH" {
-			eventType = "update"
-		} else if method == "DELETE" {
-			eventType = "delete"
-		} else if method == "GET" {
-			eventType = "view"
-		}
+		// Generate human-readable description
+		description := generateDescription(path, method, statusCode, requestBody, userID)
 
 		// Get session ID from cookies or generate one
 		sessionID := c.Cookies("session_id", "")
@@ -153,9 +133,241 @@ func maskSensitiveFields(data map[string]interface{}) {
 	}
 
 	// Recursively mask nested objects
-	for key, value := range data {
+	for _, value := range data {
 		if nested, ok := value.(map[string]interface{}); ok {
 			maskSensitiveFields(nested)
 		}
 	}
+}
+
+// categorizeEndpoint determines category, event type, and entity type from the endpoint
+func categorizeEndpoint(path, method string) (category, eventType, entityType string) {
+	// Authentication endpoints
+	if path == "/api/auth/login" {
+		return "Auth", "Login", "User"
+	}
+	if path == "/api/auth/logout" {
+		return "Auth", "Logout", "User"
+	}
+	if path == "/api/auth/change-password" {
+		return "Auth", "Change Password", "User"
+	}
+
+	// Determine entity type from path
+	entityType = "Unknown"
+	if contains(path, "/users") {
+		entityType = "User"
+	} else if contains(path, "/roles") {
+		entityType = "Role"
+	} else if contains(path, "/permissions") {
+		entityType = "Permission"
+	} else if contains(path, "/facilities") {
+		entityType = "Facility"
+	} else if contains(path, "/health-workers") {
+		entityType = "Health Worker"
+	} else if contains(path, "/assessments") {
+		entityType = "Assessment"
+	} else if contains(path, "/regions") {
+		entityType = "Region"
+	} else if contains(path, "/districts") {
+		entityType = "District"
+	} else if contains(path, "/subcounties") {
+		entityType = "Subcounty"
+	} else if contains(path, "/reports") {
+		entityType = "Report"
+	} else if contains(path, "/navigation") {
+		entityType = "Navigation"
+	}
+
+	// Determine action based on method
+	category = "API"
+	switch method {
+	case "POST":
+		eventType = "Create"
+	case "PUT", "PATCH":
+		eventType = "Update"
+	case "DELETE":
+		eventType = "Delete"
+	case "GET":
+		eventType = "View"
+	default:
+		eventType = method
+	}
+
+	return category, eventType, entityType
+}
+
+// generateDescription creates a human-readable description of what happened
+func generateDescription(path, method string, statusCode int, requestBody map[string]interface{}, userID interface{}) string {
+	success := statusCode >= 200 && statusCode < 300
+
+	// Extract resource name and ID from path
+	resourceName := extractResourceName(path)
+	resourceID := extractResourceID(path)
+
+	var description string
+
+	switch method {
+	case "POST":
+		if success {
+			if name := getNameFromBody(requestBody); name != "" {
+				description = fmt.Sprintf("Created %s '%s'", resourceName, name)
+			} else if resourceID != "" {
+				description = fmt.Sprintf("Created %s with ID %s", resourceName, resourceID)
+			} else {
+				description = fmt.Sprintf("Created new %s", resourceName)
+			}
+		} else {
+			description = fmt.Sprintf("Failed to create %s (Status: %d)", resourceName, statusCode)
+		}
+
+	case "PUT", "PATCH":
+		if success {
+			if name := getNameFromBody(requestBody); name != "" {
+				description = fmt.Sprintf("Updated %s '%s'", resourceName, name)
+			} else if resourceID != "" {
+				description = fmt.Sprintf("Updated %s ID %s", resourceName, resourceID)
+			} else {
+				description = fmt.Sprintf("Updated %s", resourceName)
+			}
+		} else {
+			description = fmt.Sprintf("Failed to update %s (Status: %d)", resourceName, statusCode)
+		}
+
+	case "DELETE":
+		if success {
+			if resourceID != "" {
+				description = fmt.Sprintf("Deleted %s ID %s", resourceName, resourceID)
+			} else {
+				description = fmt.Sprintf("Deleted %s", resourceName)
+			}
+		} else {
+			description = fmt.Sprintf("Failed to delete %s (Status: %d)", resourceName, statusCode)
+		}
+
+	case "GET":
+		if success {
+			if resourceID != "" {
+				description = fmt.Sprintf("Viewed %s ID %s", resourceName, resourceID)
+			} else {
+				description = fmt.Sprintf("Viewed %s list", resourceName)
+			}
+		} else {
+			description = fmt.Sprintf("Failed to view %s (Status: %d)", resourceName, statusCode)
+		}
+
+	default:
+		description = fmt.Sprintf("%s %s", method, path)
+	}
+
+	// Special cases
+	if path == "/api/auth/login" {
+		if success {
+			description = "User logged in successfully"
+		} else {
+			description = "Login failed - Invalid credentials"
+		}
+	} else if path == "/api/auth/logout" {
+		description = "User logged out"
+	} else if path == "/api/auth/change-password" {
+		if success {
+			description = "Password changed successfully"
+		} else {
+			description = "Failed to change password"
+		}
+	}
+
+	return description
+}
+
+// Helper functions
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && s[:len(substr)] == substr ||
+		len(s) > len(substr) && containsSubstring(s, substr)
+}
+
+func containsSubstring(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
+}
+
+func extractResourceName(path string) string {
+	// Extract the main resource from path like "/api/users/123" -> "user"
+	parts := splitPath(path)
+	for i, part := range parts {
+		if part == "api" && i+1 < len(parts) {
+			resource := parts[i+1]
+			// Singularize common plural forms
+			if len(resource) > 1 && resource[len(resource)-1] == 's' {
+				return resource[:len(resource)-1]
+			}
+			return resource
+		}
+	}
+	return "resource"
+}
+
+func extractResourceID(path string) string {
+	// Extract ID from path like "/api/users/123" -> "123"
+	parts := splitPath(path)
+	for i := len(parts) - 1; i >= 0; i-- {
+		// Check if it looks like an ID (numeric or specific pattern)
+		if isNumeric(parts[i]) {
+			return parts[i]
+		}
+	}
+	return ""
+}
+
+func splitPath(path string) []string {
+	var parts []string
+	current := ""
+	for _, char := range path {
+		if char == '/' {
+			if current != "" {
+				parts = append(parts, current)
+				current = ""
+			}
+		} else {
+			current += string(char)
+		}
+	}
+	if current != "" {
+		parts = append(parts, current)
+	}
+	return parts
+}
+
+func isNumeric(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, char := range s {
+		if char < '0' || char > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+func getNameFromBody(body map[string]interface{}) string {
+	if body == nil {
+		return ""
+	}
+
+	// Try common name fields
+	nameFields := []string{"name", "full_name", "fullName", "title", "email"}
+	for _, field := range nameFields {
+		if val, ok := body[field]; ok {
+			if str, ok := val.(string); ok && str != "" {
+				return str
+			}
+		}
+	}
+
+	return ""
 }

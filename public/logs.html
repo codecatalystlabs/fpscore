@@ -354,60 +354,48 @@
 
         // Format details from event data
         function formatDetails(event) {
-            // If page field contains a full sentence/description, use that as the main detail
-            if (event.page && event.page.includes(' ')) {
-                let details = event.page;
+            // Priority 1: Use detailed description from middleware
+            if (event.data && event.data.description) {
+                let details = event.data.description;
                 
-                // If there's additional data, show it
-                if (event.data) {
-                    if (event.data.method && event.data.url) {
-                        const duration = event.data.duration_ms ? ` <small class="text-muted">(${event.data.duration_ms}ms)</small>` : '';
-                        const success = event.data.success;
-                        const statusBadge = success 
-                            ? `<span class="badge bg-success ms-2">Success</span>`
-                            : `<span class="badge bg-danger ms-2">Failed</span>`;
-                        details += statusBadge + duration;
-                        
-                        if (!success && event.data.error) {
-                            details += `<br><small class="text-danger">${event.data.error}</small>`;
-                        }
-                    }
+                // Add status badge
+                if (event.data.success !== undefined) {
+                    const statusBadge = event.data.success 
+                        ? `` // Success is implied in the description
+                        : `<br><small class="text-danger"><i class="bi bi-x-circle"></i> Failed (Status: ${event.data.status})</small>`;
+                    details += statusBadge;
                 }
                 
                 return details;
             }
             
-            let details = event.page || '';
-            
-            if (event.data) {
-                // For API logs, show detailed information
-                if (event.data.method && event.data.url) {
-                    const method = event.data.method;
-                    const url = event.data.url;
-                    const duration = event.data.duration_ms ? `${event.data.duration_ms}ms` : '';
-                    const success = event.data.success;
-                    
-                    const statusBadge = success 
-                        ? `<span class="badge bg-success">Success</span>`
-                        : `<span class="badge bg-danger">Failed</span>`;
-                    
-                    details = `<strong>${method}</strong> ${url} ${statusBadge}`;
-                    if (duration) details += ` <small class="text-muted">(${duration})</small>`;
-                    
-                    if (!success && event.data.error) {
-                        details += `<br><small class="text-danger">${event.data.error}</small>`;
-                    }
-                } else if (event.data.entity_name) {
-                    // Business event with entity name
-                    details = event.page || event.eventType;
-                } else if (event.data.url) {
-                    details = event.data.url;
-                } else if (event.data.text) {
-                    details = event.data.text;
-                }
+            // Priority 2: If page field contains a full sentence/description
+            if (event.page && event.page.includes(' ')) {
+                return event.page;
             }
             
-            return details || '-';
+            // Priority 3: Construct from API data
+            if (event.data && event.data.method && event.data.url) {
+                const method = event.data.method;
+                const url = event.data.url;
+                const duration = event.data.duration_ms ? ` <small class="text-muted">(${event.data.duration_ms}ms)</small>` : '';
+                const success = event.data.success;
+                
+                const statusBadge = success 
+                    ? `<span class="badge bg-success-subtle text-success-emphasis">✓ Success</span>`
+                    : `<span class="badge bg-danger-subtle text-danger-emphasis">✗ Failed</span>`;
+                
+                let details = `<strong>${method}</strong> ${url} ${statusBadge}${duration}`;
+                
+                if (!success && event.data.error) {
+                    details += `<br><small class="text-danger"><i class="bi bi-exclamation-triangle"></i> ${event.data.error}</small>`;
+                }
+                
+                return details;
+            }
+            
+            // Fallback to basic info
+            return event.page || event.data?.url || event.data?.text || '-';
         }
 
         // Create log row element (table row)
@@ -426,7 +414,8 @@
 
             const userName = event.userName || event.userEmail || 'System';
             const actionIcon = getActionIcon(event.eventType);
-            const entityType = event.category || 'N/A';
+            // Use entity_type from data if available, otherwise fall back to category
+            const entityType = (event.data && event.data.entity_type) || event.category || 'N/A';
             const entityId = event.id || '-';
             const details = formatDetails(event);
 
