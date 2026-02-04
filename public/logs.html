@@ -8,13 +8,15 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
     <style>
         body {
-            background: #f5f7fa;
+            background: radial-gradient(circle at top left, #f0f4ff 0, #f5f7fa 45%, #edf2f7 100%);
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         }
         .header-section {
-            background: white;
+            background: linear-gradient(135deg, #ffffff 0, #f7f9ff 60%, #edf2ff 100%);
             padding: 2rem 0;
             margin-bottom: 2rem;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+            border-bottom: 1px solid rgba(148, 163, 184, 0.3);
         }
         .header-section h1 {
             color: #2c3e50;
@@ -39,34 +41,50 @@
             margin-right: 0.5rem;
         }
         .logs-table-section {
-            background: white;
-            padding: 1.5rem;
+            background: #ffffff;
+            padding: 1.5rem 1.5rem 1.25rem;
+            border-radius: 0.75rem;
+            box-shadow: 0 14px 30px rgba(15, 23, 42, 0.08);
+            border: 1px solid rgba(148, 163, 184, 0.35);
+        }
+        .logs-table-section .table-responsive {
             border-radius: 0.5rem;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            overflow: hidden;
         }
         .table {
             margin-bottom: 0;
+            border-collapse: separate;
+            border-spacing: 0;
         }
         .table thead th {
-            background: #f8f9fa;
-            color: #6c757d;
+            background: #f1f5f9;
+            color: #64748b;
             font-weight: 600;
             font-size: 0.75rem;
             text-transform: uppercase;
             letter-spacing: 0.5px;
             border-bottom: 2px solid #dee2e6;
             padding: 0.75rem;
+            white-space: nowrap;
         }
         .table tbody td {
             padding: 0.75rem;
             vertical-align: middle;
-            color: #495057;
+            color: #1f2933;
+            font-size: 0.9rem;
+            border-top: 1px solid #eef1f4;
         }
-        .table tbody tr:hover {
-            background: #f8f9fa;
+        .table tbody tr:nth-child(odd) td {
+            background-color: #ffffff;
+        }
+        .table tbody tr:nth-child(even) td {
+            background-color: #f9fbff;
+        }
+        .table tbody tr:hover td {
+            background: #eef5ff;
         }
         .user-badge {
-            background: #6c757d;
+            background: #0f172a;
             color: white;
             padding: 0.35rem 0.75rem;
             border-radius: 1rem;
@@ -116,13 +134,27 @@
     </style>
 </head>
 <body>
-    <div class="header-section">
-        <div class="container">
-            <h1><i class="bi bi-clock-history"></i> Audit Logs</h1>
+    <div class="d-flex">
+        <!-- Sidebar (same pattern as other pages) -->
+        <div class="bg-light border-end" style="width: 260px; min-height: 100vh;">
+            <div class="p-3 border-bottom fw-bold">
+                <i class="bi bi-diagram-3"></i> Navigation
+            </div>
+            <div class="list-group list-group-flush" id="navigationItems">
+                <!-- Navigation items will be loaded dynamically based on permissions -->
+            </div>
         </div>
-    </div>
 
-    <div class="container">
+        <div class="flex-grow-1">
+            <div class="header-section">
+                <div class="container-fluid">
+                    <h1 class="mb-0">
+                        <i class="bi bi-clock-history"></i> Audit Logs
+                    </h1>
+                </div>
+            </div>
+
+            <div class="container-fluid">
         <!-- Filters -->
         <div class="filter-section">
             <h6><i class="bi bi-funnel"></i> Filters</h6>
@@ -175,6 +207,9 @@
 
         <!-- Logs Table -->
         <div class="logs-table-section">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <div id="logsSummary" class="text-muted small"></div>
+            </div>
             <div class="table-responsive">
                 <table class="table table-hover" id="logsTable">
                     <thead>
@@ -206,7 +241,9 @@
             <ul class="pagination justify-content-center" id="paginationList">
             </ul>
         </nav>
-    </div>
+            </div> <!-- /.container-fluid -->
+        </div> <!-- /.flex-grow-1 -->
+    </div> <!-- /.d-flex -->
 
     <script src="event-logger.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
@@ -330,6 +367,14 @@
                     const row = createLogRow(event);
                     container.appendChild(row);
                 });
+
+                // Update summary text
+                const summary = document.getElementById('logsSummary');
+                if (summary) {
+                    const start = (data.page - 1) * data.limit + 1;
+                    const end = start + data.events.length - 1;
+                    summary.textContent = `Showing ${start.toLocaleString()}–${end.toLocaleString()} of ${data.total.toLocaleString()} log entries`;
+                }
 
                 updatePagination(data.page, data.pages, data.total);
             } catch (error) {

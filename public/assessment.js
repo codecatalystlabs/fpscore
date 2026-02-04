@@ -121,13 +121,17 @@ async function loadThematicAreas() {
             throw new Error('Invalid response format: expected array of thematic areas');
         }
         
-        // Deduplicate by id
-        const seenIds = new Set();
+        // Deduplicate thematic areas by logical identity (name + display order),
+        // not just by id, to guard against duplicate rows with different ids.
+        const seenAreaKeys = new Set();
         const uniqueThematicAreas = thematicAreas.filter(area => {
-            if (seenIds.has(area.id)) {
+            const name = String(area.name || '').trim().toLowerCase();
+            const order = typeof area.displayOrder === 'number' ? area.displayOrder : '';
+            const key = `${name}|${order}`;
+            if (seenAreaKeys.has(key)) {
                 return false;
             }
-            seenIds.add(area.id);
+            seenAreaKeys.add(key);
             return true;
         });
         
@@ -180,14 +184,16 @@ async function loadQuestions(thematicAreaId) {
         }
         const questions = await response.json();
         
-        // Deduplicate by id
+        // Deduplicate questions by text within a thematic area, not just by id.
         if (Array.isArray(questions)) {
-            const seenIds = new Set();
+            const seenQuestionKeys = new Set();
             return questions.filter(q => {
-                if (seenIds.has(q.id)) {
+                const text = String(q.text || '').trim().toLowerCase();
+                const key = `${thematicAreaId}|${text}`;
+                if (seenQuestionKeys.has(key)) {
                     return false;
                 }
-                seenIds.add(q.id);
+                seenQuestionKeys.add(key);
                 return true;
             });
         }

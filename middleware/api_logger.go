@@ -65,7 +65,13 @@ func APILogger() fiber.Handler {
 		statusCode := c.Response().StatusCode()
 		success := statusCode >= 200 && statusCode < 300
 
-		// Prepare log data
+		// Determine event category, type, and entity
+		category, eventType, entityType := categorizeEndpoint(path, method)
+
+		// Generate human-readable description
+		description := generateDescription(path, method, statusCode, requestBody, userID)
+
+		// Prepare log data that will be stored in events.data (JSONB)
 		logData := map[string]interface{}{
 			"method":      method,
 			"url":         url,
@@ -90,12 +96,6 @@ func APILogger() fiber.Handler {
 		if err != nil {
 			logData["error"] = err.Error()
 		}
-
-		// Determine event category, type, and entity
-		category, eventType, entityType := categorizeEndpoint(path, method)
-
-		// Generate human-readable description
-		description := generateDescription(path, method, statusCode, requestBody, userID)
 
 		// Get session ID from cookies or generate one
 		sessionID := c.Cookies("session_id", "")
