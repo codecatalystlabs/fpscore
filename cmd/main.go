@@ -173,6 +173,7 @@ func main() {
 	api.Get("/events", handlers.CheckPermission("logs.view"), handlers.GetEvents)
 	api.Get("/events/categories", handlers.CheckPermission("logs.view"), handlers.GetEventCategories)
 	api.Get("/events/types", handlers.CheckPermission("logs.view"), handlers.GetEventTypes)
+	api.Get("/events/health", handlers.CheckAuditLogHealth) // Health check endpoint (no permission required, but auth required)
 
 	log.Printf("Server starting on port %s", cfg.Port)
 	log.Fatal(app.Listen(":" + cfg.Port))

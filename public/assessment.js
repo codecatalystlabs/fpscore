@@ -52,7 +52,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     document.getElementById('submitAssessment').addEventListener('click', submitAssessment);
-});
+});         
 
 // Load health worker info and set it in the form
 async function loadHealthWorkerInfo() {

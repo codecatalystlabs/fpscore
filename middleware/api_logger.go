@@ -108,13 +108,21 @@ func APILogger() fiber.Handler {
 
 		// Insert into database asynchronously (don't block the response)
 		go func() {
+			// Check if database connection exists
+			if database.DB == nil {
+				fmt.Printf("[API Logger] ERROR: Database connection is nil\n")
+				return
+			}
+
 			_, err := database.DB.Exec(`
 				INSERT INTO events (user_id, session_id, category, event_type, page, data, created_at)
 				VALUES ($1, $2, $3, $4, $5, $6, $7)
 			`, userID, sessionID, category, eventType, path, string(dataJSON), time.Now())
 
 			if err != nil {
-				fmt.Printf("Error logging API call: %v\n", err)
+				// Log error but don't crash the app
+				fmt.Printf("[API Logger] ERROR logging API call to database: %v\n", err)
+				fmt.Printf("[API Logger] Path: %s, Method: %s, UserID: %v\n", path, method, userID)
 			}
 		}()
 

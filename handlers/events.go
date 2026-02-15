@@ -340,3 +340,76 @@ func GetEventTypes(c *fiber.Ctx) error {
 
 	return c.JSON(eventTypes)
 }
+
+// CheckAuditLogHealth checks if audit logging is working properly
+func CheckAuditLogHealth(c *fiber.Ctx) error {
+	health := map[string]interface{}{
+		"status":       "ok",
+		"database":     "connected",
+		"table_exists": false,
+		"can_insert":   false,
+		"can_query":    false,
+	}
+
+	// Check if database is connected
+	if database.DB == nil {
+		health["status"] = "error"
+		health["database"] = "not_connected"
+		return c.JSON(health)
+	}
+
+	// Check if events table exists
+	var tableExists bool
+	err := database.DB.QueryRow(`
+		SELECT EXISTS (
+			SELECT FROM information_schema.tables 
+			WHERE table_schema = 'public' 
+			AND table_name = 'events'
+		)
+	`).Scan(&tableExists)
+
+	if err != nil {
+		health["status"] = "error"
+		health["error"] = err.Error()
+		return c.JSON(health)
+	}
+
+	health["table_exists"] = tableExists
+
+	if !tableExists {
+		health["status"] = "error"
+		health["message"] = "Events table does not exist. Run schema.sql to create it."
+		return c.JSON(health)
+	}
+
+	// Test INSERT
+	testSessionID := fmt.Sprintf("health_check_%d", time.Now().UnixNano())
+	_, err = database.DB.Exec(`
+		INSERT INTO events (user_id, session_id, category, event_type, page, data, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+	`, nil, testSessionID, "application", "health_check", "/api/events/health", `{"test": true}`, time.Now())
+
+	if err != nil {
+		health["status"] = "error"
+		health["can_insert"] = false
+		health["insert_error"] = err.Error()
+	} else {
+		health["can_insert"] = true
+		// Clean up test record
+		database.DB.Exec("DELETE FROM events WHERE session_id = $1", testSessionID)
+	}
+
+	// Test SELECT
+	var count int
+	err = database.DB.QueryRow("SELECT COUNT(*) FROM events LIMIT 1").Scan(&count)
+	if err != nil {
+		health["status"] = "error"
+		health["can_query"] = false
+		health["query_error"] = err.Error()
+	} else {
+		health["can_query"] = true
+		health["total_events"] = count
+	}
+
+	return c.JSON(health)
+}
