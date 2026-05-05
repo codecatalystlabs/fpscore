@@ -748,13 +748,26 @@ func GetAssessments(c *fiber.Ctx) error {
 	}
 	// If admin, these arrays remain empty, allowing access to all assessments
 
-	// Build query with filters - join through hierarchy to get region/district info
+	includeThematic := c.Query("includeThematicScores") == "1" || strings.ToLower(c.Query("includeThematicScores")) == "true"
+
+	// Build query with filters - join through hierarchy to get region/district info.
+	// Optionally include thematic area scores so the dashboard can visualize by thematic area.
 	query := `
 		SELECT a.id, a.created_at, a.percentage_score, a.performance_level,
 		       f.name as facility_name, at.name as assessment_type,
 		       a.assessor_name, a.client_name, 
 		       r.id as region_id, d.id as district_id, s.id as subcounty_id, f.id as facility_id,
 		       hw.id as health_worker_id, hw.full_name as health_worker_name
+	`
+	if includeThematic {
+		query += `,
+		       ta.id as thematic_area_id, ta.name as thematic_area_name,
+		       tas.percentage_score as thematic_percentage_score,
+		       tas.possible_score as thematic_possible_score,
+		       tas.achieved_score as thematic_achieved_score
+		`
+	}
+	query += `
 		FROM assessments a
 		JOIN health_workers hw ON a.health_worker_id = hw.id
 		JOIN facilities f ON a.facility_id = f.id
@@ -762,6 +775,14 @@ func GetAssessments(c *fiber.Ctx) error {
 		JOIN districts d ON s.district_id = d.id
 		JOIN regions r ON d.region_id = r.id
 		JOIN assessment_types at ON a.assessment_type_id = at.id
+	`
+	if includeThematic {
+		query += `
+		JOIN thematic_area_scores tas ON tas.assessment_id = a.id
+		JOIN thematic_areas ta ON tas.thematic_area_id = ta.id
+		`
+	}
+	query += `
 		WHERE 1=1
 	`
 	args := []interface{}{}
@@ -839,9 +860,19 @@ func GetAssessments(c *fiber.Ctx) error {
 		args = append(args, districtID)
 		argIdx++
 	}
+	if subcountyID := c.Query("subcountyId"); subcountyID != "" {
+		query += fmt.Sprintf(" AND s.id = $%d", argIdx)
+		args = append(args, subcountyID)
+		argIdx++
+	}
 	if facilityID := c.Query("facilityId"); facilityID != "" {
 		query += fmt.Sprintf(" AND f.id = $%d", argIdx)
 		args = append(args, facilityID)
+		argIdx++
+	}
+	if healthWorkerID := c.Query("healthWorkerId"); healthWorkerID != "" {
+		query += fmt.Sprintf(" AND hw.id = $%d", argIdx)
+		args = append(args, healthWorkerID)
 		argIdx++
 	}
 	if assessmentTypeID := c.Query("assessmentTypeId"); assessmentTypeID != "" {
@@ -850,8 +881,22 @@ func GetAssessments(c *fiber.Ctx) error {
 		argIdx++
 	}
 	if thematicAreaID := c.Query("thematicAreaId"); thematicAreaID != "" {
-		query += fmt.Sprintf(" AND EXISTS (SELECT 1 FROM assessment_responses ar JOIN questions q ON ar.question_id = q.id WHERE ar.assessment_id = a.id AND q.thematic_area_id = $%d)", argIdx)
+		if includeThematic {
+			query += fmt.Sprintf(" AND ta.id = $%d", argIdx)
+		} else {
+			query += fmt.Sprintf(" AND EXISTS (SELECT 1 FROM assessment_responses ar JOIN questions q ON ar.question_id = q.id WHERE ar.assessment_id = a.id AND q.thematic_area_id = $%d)", argIdx)
+		}
 		args = append(args, thematicAreaID)
+		argIdx++
+	}
+	if startDate := c.Query("startDate"); startDate != "" {
+		query += fmt.Sprintf(" AND DATE(a.created_at) >= $%d", argIdx)
+		args = append(args, startDate)
+		argIdx++
+	}
+	if endDate := c.Query("endDate"); endDate != "" {
+		query += fmt.Sprintf(" AND DATE(a.created_at) <= $%d", argIdx)
+		args = append(args, endDate)
 		argIdx++
 	}
 
@@ -870,22 +915,80 @@ func GetAssessments(c *fiber.Ctx) error {
 		var percentage float64
 		var performanceLevel, facilityName, assessmentType, healthWorkerName string
 		var regionID, districtID, subcountyID, facilityID, healthWorkerID sql.NullInt64
-		if err := rows.Scan(&id, &createdAt, &percentage, &performanceLevel, &facilityName, &assessmentType, &assessorName, &clientName, &regionID, &districtID, &subcountyID, &facilityID, &healthWorkerID, &healthWorkerName); err != nil {
-			return err
-		}
+		if includeThematic {
+			var thematicAreaID sql.NullInt64
+			var thematicAreaName sql.NullString
+			var thematicPercentage sql.NullFloat64
+			var thematicPossible, thematicAchieved sql.NullInt64
+			if err := rows.Scan(
+				&id, &createdAt, &percentage, &performanceLevel,
+				&facilityName, &assessmentType,
+				&assessorName, &clientName,
+				&regionID, &districtID, &subcountyID, &facilityID,
+				&healthWorkerID, &healthWorkerName,
+				&thematicAreaID, &thematicAreaName,
+				&thematicPercentage, &thematicPossible, &thematicAchieved,
+			); err != nil {
+				return err
+			}
+			assessments = append(assessments, map[string]interface{}{
+				"id":                     id,
+				"createdAt":              createdAt.String,
+				"percentage":             percentage,
+				"performanceLevel":       performanceLevel,
+				"facilityName":           facilityName,
+				"assessmentType":         assessmentType,
+				"assessorName":           assessorName.String,
+				"clientName":             clientName.String,
+				"healthWorkerId":         healthWorkerID.Int64,
+				"healthWorkerName":       healthWorkerName,
+				"regionId":               regionID.Int64,
+				"districtId":             districtID.Int64,
+				"subcountyId":            subcountyID.Int64,
+				"facilityId":             facilityID.Int64,
+				"thematicAreaId":         thematicAreaID.Int64,
+				"thematicArea":           thematicAreaName.String,
+				"thematicPercentageScore": func() float64 {
+					if thematicPercentage.Valid {
+						return thematicPercentage.Float64
+					}
+					return 0
+				}(),
+				"thematicPossibleScore": func() int64 {
+					if thematicPossible.Valid {
+						return thematicPossible.Int64
+					}
+					return 0
+				}(),
+				"thematicAchievedScore": func() int64 {
+					if thematicAchieved.Valid {
+						return thematicAchieved.Int64
+					}
+					return 0
+				}(),
+			})
+		} else {
+			if err := rows.Scan(&id, &createdAt, &percentage, &performanceLevel, &facilityName, &assessmentType, &assessorName, &clientName, &regionID, &districtID, &subcountyID, &facilityID, &healthWorkerID, &healthWorkerName); err != nil {
+				return err
+			}
 
-		assessments = append(assessments, map[string]interface{}{
-			"id":               id,
-			"createdAt":        createdAt.String,
-			"percentage":       percentage,
-			"performanceLevel": performanceLevel,
-			"facilityName":     facilityName,
-			"assessmentType":   assessmentType,
-			"assessorName":     assessorName.String,
-			"clientName":       clientName.String,
-			"healthWorkerId":   healthWorkerID.Int64,
-			"healthWorkerName": healthWorkerName,
-		})
+			assessments = append(assessments, map[string]interface{}{
+				"id":               id,
+				"createdAt":        createdAt.String,
+				"percentage":       percentage,
+				"performanceLevel": performanceLevel,
+				"facilityName":     facilityName,
+				"assessmentType":   assessmentType,
+				"assessorName":     assessorName.String,
+				"clientName":       clientName.String,
+				"healthWorkerId":   healthWorkerID.Int64,
+				"healthWorkerName": healthWorkerName,
+				"regionId":         regionID.Int64,
+				"districtId":       districtID.Int64,
+				"subcountyId":      subcountyID.Int64,
+				"facilityId":       facilityID.Int64,
+			})
+		}
 	}
 
 	return c.JSON(assessments)

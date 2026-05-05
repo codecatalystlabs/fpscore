@@ -146,6 +146,36 @@ FROM thematic_areas ta,
 WHERE ta.assessment_type_id = 1 AND ta.name = 'Post-partum client'
 ON CONFLICT DO NOTHING;
 
+-- Thematic Area 10: Self-injecting client
+INSERT INTO thematic_areas (assessment_type_id, name, display_order) VALUES
+(1, 'Self-injecting client', 10)
+ON CONFLICT DO NOTHING;
+
+INSERT INTO questions (thematic_area_id, question_text, score_weight, is_critical, is_important, display_order)
+SELECT ta.id, q.question_text, q.score_weight, q.is_critical, q.is_important, q.display_order
+FROM thematic_areas ta,
+(VALUES
+    ('Actively listens and uses open-ended questions to uncover client barriers to self-injection (Observe and see if the provider uses active listening techniques like paraphrasing, affirming, clarifying and empathy; non-verbal communication and open-ended questions to uncover client barriers to self inject e.g fear of pain, fear of the needle, lack of confidence to correctly inject, product safety concerns, covert use due to partner opposition )', 10, true, false, 1),
+    ('Uses targeted messaging to address the identified barrier to self-injection expressed by the client (Observe and see if the provider uses empathetic messages to avert client''s fear to self injection)', 5, false, true, 2)
+) AS q(question_text, score_weight, is_critical, is_important, display_order)
+WHERE ta.assessment_type_id = 1 AND ta.name = 'Self-injecting client'
+ON CONFLICT DO NOTHING;
+
+-- Thematic Area 11: Storage and Disposal at Home
+INSERT INTO thematic_areas (assessment_type_id, name, display_order) VALUES
+(1, 'Storage and Disposal at Home: Assesses whether health workers are giving correct guidance about storage and disposal', 11)
+ON CONFLICT DO NOTHING;
+
+INSERT INTO questions (thematic_area_id, question_text, score_weight, is_critical, is_important, display_order)
+SELECT ta.id, q.question_text, q.score_weight, q.is_critical, q.is_important, q.display_order
+FROM thematic_areas ta,
+(VALUES
+    ('Discusses with client home storage information of the units dispensed (Observe and listen: 1.Store at room temperature (do not refrigerate); 2.Store out of direct sunlight and heat; 3.Store out of reach of children and animals)', 5, false, true, 1),
+    ('Discusses with client how to manage product waste at home (Look out for: 1. Do not touch the needle; 2. Do not recap the needle; 3. Dispose used needle in puncture-proof container at home e.g plastic bottle; 4. Return the container with used needles to the health facility when coming for refill)', 5, false, true, 2)
+) AS q(question_text, score_weight, is_critical, is_important, display_order)
+WHERE ta.assessment_type_id = 1 AND ta.name = 'Storage and Disposal at Home: Assesses whether health workers are giving correct guidance about storage and disposal'
+ON CONFLICT DO NOTHING;
+
 -- ============================================
 -- OCPs (Assessment Type ID: 2)
 -- ============================================
@@ -293,6 +323,55 @@ FROM thematic_areas ta,
     ('Provides post injection counselling, confirms client understands duration of use, what to expect, need for regular injections and date of next injection', 2, false, false, 4)
 ) AS q(question_text, score_weight, is_critical, is_important, display_order)
 WHERE ta.assessment_type_id = 3 AND ta.name = 'Post-Injection Care and Documentation'
+ON CONFLICT DO NOTHING;
+
+-- Thematic Area 7: Self-injection (SI) training and follow-up
+INSERT INTO thematic_areas (assessment_type_id, name, display_order) VALUES
+(3, 'Self-injection (SI) training and follow-up', 7)
+ON CONFLICT DO NOTHING;
+
+INSERT INTO questions (thematic_area_id, question_text, score_weight, is_critical, is_important, display_order)
+SELECT ta.id, q.question_text, q.score_weight, q.is_critical, q.is_important, q.display_order
+FROM thematic_areas ta,
+(VALUES
+    ('The provider walks the client through all the 4 critical steps (Mix, Activate, Pinch, slow pressing to release the drug) for SI provision (Observe the provider takes the client through all the 4 steps)', 10, true, false, 1),
+    ('Provider uses models and instruction sheets to demonstrate SI (Check if the provider uses salt filled condom models and the self inject instructional sheet to demonstrate)', 2, false, false, 2),
+    ('*Provider trains client to use the calendar to calculate reinjection dates (Observe)', 5, false, true, 3)
+) AS q(question_text, score_weight, is_critical, is_important, display_order)
+WHERE ta.assessment_type_id = 3 AND ta.name = 'Self-injection (SI) training and follow-up'
+ON CONFLICT DO NOTHING;
+
+-- Thematic Area 8: Handling clients not ready for independent SI
+INSERT INTO thematic_areas (assessment_type_id, name, display_order) VALUES
+(3, 'Health provider appropriately handles client who is not ready for independent self-injection', 8)
+ON CONFLICT DO NOTHING;
+
+INSERT INTO questions (thematic_area_id, question_text, score_weight, is_critical, is_important, display_order)
+SELECT ta.id, q.question_text, q.score_weight, q.is_critical, q.is_important, q.display_order
+FROM thematic_areas ta,
+(VALUES
+    ('Health worker gives the DMPA-SC injection, then asks the client to return for SI retraining at their next injection.', 2, false, true, 1),
+    ('Health worker does not give out units until the client has demonstrated readiness.', 2, false, true, 2)
+) AS q(question_text, score_weight, is_critical, is_important, display_order)
+WHERE ta.assessment_type_id = 3 AND ta.name = 'Health provider appropriately handles client who is not ready for independent self-injection'
+ON CONFLICT DO NOTHING;
+
+-- Thematic Area 9: Returning self-injection clients
+INSERT INTO thematic_areas (assessment_type_id, name, display_order) VALUES
+(3, 'Information and discussion areas for returning self-injection clients', 9)
+ON CONFLICT DO NOTHING;
+
+INSERT INTO questions (thematic_area_id, question_text, score_weight, is_critical, is_important, display_order)
+SELECT ta.id, q.question_text, q.score_weight, q.is_critical, q.is_important, q.display_order
+FROM thematic_areas ta,
+(VALUES
+    ('Evaluates whether the client is experiencing any problems, including side effects.', 2, false, false, 1),
+    ('Screens for eligibility and willingness to continue with self-injection.', 2, false, false, 2),
+    ('Reviews the 4 critical injection steps and any questions about self-injection.', 2, false, false, 3),
+    ('Provides additional training/guidance on injection or reinjection timing as needed.', 2, false, false, 4),
+    ('Provides recommended number of DMPA-SC units if adequate stock available and any other applicable supplies.', 2, false, false, 5)
+) AS q(question_text, score_weight, is_critical, is_important, display_order)
+WHERE ta.assessment_type_id = 3 AND ta.name = 'Information and discussion areas for returning self-injection clients'
 ON CONFLICT DO NOTHING;
 
 -- ============================================

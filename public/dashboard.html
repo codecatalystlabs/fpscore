@@ -6,27 +6,181 @@
     <title>Dashboard - Family Planning Score Tool</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f5f7fb;
+        }
+        .sidebar {
+            width: 260px;
+            min-height: 100vh;
+            background: #ffffff;
+            border-right: 1px solid #e5e7eb;
+        }
+        .sidebar-header {
+            padding: 1rem 1.25rem;
+            border-bottom: 1px solid #e5e7eb;
+            font-weight: 600;
+            font-size: 0.95rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: #6b7280;
+        }
+        .main-shell {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .top-bar {
+            background: linear-gradient(135deg, #2563eb 0%, #4f46e5 100%);
+            color: #ffffff;
+        }
+        .top-bar-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+        .summary-chip {
+            background: rgba(255,255,255,0.08);
+            border-radius: 999px;
+            padding: 0.25rem 0.75rem;
+            font-size: 0.8rem;
+        }
+        .content-wrapper {
+            padding: 1.5rem 1.5rem 2rem;
+        }
+        .metric-card {
+            border: none;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+        }
+        .metric-label {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            opacity: 0.9;
+        }
+        .metric-value {
+            font-size: 1.6rem;
+            font-weight: 600;
+        }
+        .filters-card {
+            border-radius: 0.75rem;
+            border: none;
+            box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04);
+        }
+        .filters-card .card-title {
+            font-size: 0.95rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #6b7280;
+        }
+        .nav-tabs .nav-link {
+            border: none;
+            border-bottom: 2px solid transparent;
+            font-weight: 500;
+            color: #6b7280;
+        }
+        .nav-tabs .nav-link.active {
+            color: #111827;
+            border-color: #2563eb;
+            background-color: transparent;
+        }
+        .card {
+            border-radius: 0.75rem;
+        }
+        .card > .card-body {
+            padding: 1.25rem 1.5rem;
+        }
+        .chart-card canvas {
+            width: 100% !important;
+        }
+        .chart-wrap {
+            min-height: 460px;
+        }
+        @media (min-width: 992px) {
+            .chart-wrap {
+                min-height: 520px;
+            }
+        }
+        .filters-grid .form-label {
+            font-size: 0.8rem;
+            color: #6b7280;
+        }
+        #recentAssessments {
+            max-height: 380px;
+            overflow-y: auto;
+        }
+        #recentAssessments .border-bottom:last-child {
+            border-bottom: none !important;
+        }
+    </style>
 </head>
 <body>
     <div class="d-flex">
-        <div class="bg-light border-end" style="width: 260px; min-height: 100vh;">
-            <div class="p-3 border-bottom fw-bold">
-                <i class="bi bi-diagram-3"></i> Navigation
+        <div class="sidebar">
+            <div class="sidebar-header d-flex align-items-center justify-content-between">
+                <span><i class="bi bi-diagram-3 me-2"></i>Navigation</span>
             </div>
             <div class="list-group list-group-flush" id="navigationItems">
                 <!-- Navigation items will be loaded dynamically based on permissions -->
             </div>
         </div>
 
-        <div class="flex-grow-1">
-            <div class="p-4">
-                <h3 class="mb-4"><i class="bi bi-speedometer2"></i> Dashboard</h3>
+        <div class="flex-grow-1 main-shell">
+            <header class="top-bar">
+                <div class="d-flex align-items-center justify-content-between px-4 py-3">
+                    <div>
+                        <div class="top-bar-title">
+                            <i class="bi bi-speedometer2 me-2"></i>Dashboard
+                        </div>
+                        <div class="d-flex flex-wrap gap-2 mt-1">
+                            <span class="summary-chip">
+                                Overall view of facility assessment performance
+                            </span>
+                        </div>
+                    </div>
+                    <button class="btn btn-outline-light btn-sm" onclick="logout()">
+                        <i class="bi bi-box-arrow-right me-1"></i>Logout
+                    </button>
+                </div>
+            </header>
+
+            <div class="content-wrapper">
 
                 <!-- Filters -->
-                <div class="card mb-4">
+                <div class="card mb-4 filters-card">
                     <div class="card-body">
-                        <h5 class="card-title">Filters</h5>
-                        <div class="row g-3">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="card-title mb-0">
+                                <i class="bi bi-funnel me-2 text-primary"></i>Filters
+                            </h5>
+                            <small class="text-muted">Use these to focus on specific regions, assessment types or thematic areas.</small>
+                        </div>
+                        <div class="row g-3 filters-grid">
+                            <div class="col-md-3">
+                                <label class="form-label">Period</label>
+                                <select class="form-select" id="filterPeriod">
+                                    <option value="">All time</option>
+                                    <option value="7d">Last 7 days</option>
+                                    <option value="30d" selected>Last 30 days</option>
+                                    <option value="90d">Last 90 days</option>
+                                    <option value="ytd">Year to date</option>
+                                    <option value="custom">Custom range…</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Start date</label>
+                                <input type="date" class="form-control" id="filterStartDate" disabled>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">End date</label>
+                                <input type="date" class="form-control" id="filterEndDate" disabled>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Person assessed (Health Worker)</label>
+                                <select class="form-select" id="filterHealthWorker">
+                                    <option value="">All Health Workers</option>
+                                </select>
+                            </div>
                             <div class="col-md-3">
                                 <label class="form-label">Region</label>
                                 <select class="form-select" id="filterRegion">
@@ -37,6 +191,18 @@
                                 <label class="form-label">District</label>
                                 <select class="form-select" id="filterDistrict" disabled>
                                     <option value="">All Districts</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Subcounty</label>
+                                <select class="form-select" id="filterSubcounty" disabled>
+                                    <option value="">All Subcounties</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Facility</label>
+                                <select class="form-select" id="filterFacility" disabled>
+                                    <option value="">All Facilities</option>
                                 </select>
                             </div>
                             <div class="col-md-3">
@@ -59,14 +225,14 @@
                     </div>
                 </div>
 
-                <div class="row g-3">
+                <div class="row g-3 mb-2">
                     <div class="col-md-3">
-                        <div class="card text-bg-primary">
+                        <div class="card text-bg-primary metric-card">
                             <div class="card-body">
                                 <div class="d-flex justify-content-between align-items-center">
                                     <div>
-                                        <h5 class="card-title mb-1">Assessments</h5>
-                                        <div id="metricAssessments" class="fs-4">0</div>
+                                        <div class="metric-label">Total Assessments</div>
+                                        <div id="metricAssessments" class="metric-value">0</div>
                                     </div>
                                     <i class="bi bi-clipboard2-check fs-1"></i>
                                 </div>
@@ -74,26 +240,26 @@
                         </div>
                     </div>
                     <div class="col-md-3">
-                        <div class="card text-bg-success">
+                        <div class="card text-bg-success metric-card">
                             <div class="card-body">
-                                <h5 class="card-title mb-1">Average Score</h5>
-                                <div id="metricAvgScore" class="fs-4">0%</div>
+                                <div class="metric-label">Average Score</div>
+                                <div id="metricAvgScore" class="metric-value">0%</div>
                             </div>
                         </div>
                     </div>
                     <div class="col-md-3">
-                        <div class="card text-bg-warning">
+                        <div class="card text-bg-warning metric-card">
                             <div class="card-body">
-                                <h5 class="card-title mb-1">Competent</h5>
-                                <div id="metricCompetent" class="fs-4">0</div>
+                                <div class="metric-label">Competent Assessments</div>
+                                <div id="metricCompetent" class="metric-value">0</div>
                             </div>
                         </div>
                     </div>
                     <div class="col-md-3">
-                        <div class="card text-bg-danger">
+                        <div class="card text-bg-danger metric-card">
                             <div class="card-body">
-                                <h5 class="card-title mb-1">Not Acceptable</h5>
-                                <div id="metricNA" class="fs-4">0</div>
+                                <div class="metric-label">Not Acceptable</div>
+                                <div id="metricNA" class="metric-value">0</div>
                             </div>
                         </div>
                     </div>
@@ -132,26 +298,53 @@
                         </div>
                     </div>
                     <div class="tab-pane fade" id="thematicTab" role="tabpanel" aria-labelledby="thematic-tab">
-                        <div class="card">
+                        <div class="card chart-card">
                             <div class="card-body">
-                                <h5 class="card-title">Average Scores by Assessment Type</h5>
-                                <canvas id="thematicChart" height="320"></canvas>
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h5 class="card-title mb-0">Average Scores by Assessment Type</h5>
+                                    <small class="text-muted">Hover bars to see average percentage score per assessment type.</small>
+                                </div>
+                                <div class="position-relative chart-wrap">
+                                    <div id="thematicEmptyState" class="position-absolute top-50 start-50 translate-middle text-muted text-center d-none">
+                                        <i class="bi bi-graph-up mb-2" style="font-size: 1.8rem;"></i>
+                                        <p class="mb-0">No data available for the current filters.</p>
+                                    </div>
+                                    <canvas id="thematicChart" height="440"></canvas>
+                                </div>
                             </div>
                         </div>
                     </div>
                     <div class="tab-pane fade" id="trendTab" role="tabpanel" aria-labelledby="trend-tab">
-                        <div class="card">
+                        <div class="card chart-card">
                             <div class="card-body">
-                                <h5 class="card-title">Monthly Assessment Trend</h5>
-                                <canvas id="trendChart" height="320"></canvas>
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h5 class="card-title mb-0">Monthly Assessment Trend</h5>
+                                    <small class="text-muted">Shows average percentage score by month.</small>
+                                </div>
+                                <div class="position-relative chart-wrap">
+                                    <div id="trendEmptyState" class="position-absolute top-50 start-50 translate-middle text-muted text-center d-none">
+                                        <i class="bi bi-activity mb-2" style="font-size: 1.8rem;"></i>
+                                        <p class="mb-0">No trend data yet. Try widening the date range or removing filters.</p>
+                                    </div>
+                                    <canvas id="trendChart" height="440"></canvas>
+                                </div>
                             </div>
                         </div>
                     </div>
                     <div class="tab-pane fade" id="performanceTab" role="tabpanel" aria-labelledby="level-tab">
-                        <div class="card">
+                        <div class="card chart-card">
                             <div class="card-body">
-                                <h5 class="card-title">Performance Level Distribution</h5>
-                                <canvas id="performanceChart" height="320"></canvas>
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h5 class="card-title mb-0">Performance Level Distribution</h5>
+                                    <small class="text-muted">Share of assessments that are Proficient, Competent or Not Acceptable.</small>
+                                </div>
+                                <div class="position-relative chart-wrap">
+                                    <div id="performanceEmptyState" class="position-absolute top-50 start-50 translate-middle text-muted text-center d-none">
+                                        <i class="bi bi-pie-chart mb-2" style="font-size: 1.8rem;"></i>
+                                        <p class="mb-0">No assessments found for the selected filters.</p>
+                                    </div>
+                                    <canvas id="performanceChart" height="440"></canvas>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -196,6 +389,44 @@
             window.location.href = '/';
         }
 
+        function setDateRangeFromPeriod(period) {
+            const startEl = document.getElementById('filterStartDate');
+            const endEl = document.getElementById('filterEndDate');
+            const now = new Date();
+
+            const yyyyMmDd = (d) => {
+                const y = d.getFullYear();
+                const m = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                return `${y}-${m}-${day}`;
+            };
+
+            if (period === 'custom') {
+                startEl.disabled = false;
+                endEl.disabled = false;
+                return;
+            }
+
+            startEl.disabled = true;
+            endEl.disabled = true;
+            startEl.value = '';
+            endEl.value = '';
+
+            if (!period) return;
+
+            const end = new Date(now);
+            let start = null;
+            if (period === '7d') start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7);
+            if (period === '30d') start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30);
+            if (period === '90d') start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 90);
+            if (period === 'ytd') start = new Date(now.getFullYear(), 0, 1);
+
+            if (start) {
+                startEl.value = yyyyMmDd(start);
+                endEl.value = yyyyMmDd(end);
+            }
+        }
+
         async function loadFilters() {
             try {
                 const [regions, types] = await Promise.all([
@@ -225,6 +456,24 @@
                     opt.textContent = t.name;
                     document.getElementById('filterAssessmentType').appendChild(opt);
                 });
+
+                // Health workers (best-effort; may be blocked by permissions)
+                try {
+                    const hwResp = await fetch(`${API_BASE}/health-workers-with-assessments`, {headers: getAuthHeaders()});
+                    if (hwResp.ok) {
+                        const hws = await hwResp.json();
+                        const hwSelect = document.getElementById('filterHealthWorker');
+                        hws.forEach(hw => {
+                            const opt = document.createElement('option');
+                            opt.value = hw.id;
+                            opt.textContent = hw.full_name || hw.fullName || hw.name || `Health Worker ${hw.id}`;
+                            hwSelect.appendChild(opt);
+                        });
+                    }
+                } catch (e) {}
+
+                // Initialize default period dates (Last 30 days)
+                setDateRangeFromPeriod(document.getElementById('filterPeriod').value || '30d');
             } catch (e) {
                 console.error('Error loading filters:', e);
             }
@@ -233,6 +482,8 @@
         document.getElementById('filterRegion').addEventListener('change', async function() {
             const regionId = this.value;
             const districtSelect = document.getElementById('filterDistrict');
+            const subcountySelect = document.getElementById('filterSubcounty');
+            const facilitySelect = document.getElementById('filterFacility');
             if (regionId) {
                 try {
                     const districts = await fetch(`${API_BASE}/districts/${regionId}`, {headers: getAuthHeaders()}).then(r=>r.json());
@@ -244,10 +495,65 @@
                         districtSelect.appendChild(opt);
                     });
                     districtSelect.disabled = false;
+                    subcountySelect.innerHTML = '<option value="">All Subcounties</option>';
+                    subcountySelect.disabled = true;
+                    facilitySelect.innerHTML = '<option value="">All Facilities</option>';
+                    facilitySelect.disabled = true;
                 } catch (e) {}
             } else {
                 districtSelect.innerHTML = '<option value="">All Districts</option>';
                 districtSelect.disabled = true;
+                subcountySelect.innerHTML = '<option value="">All Subcounties</option>';
+                subcountySelect.disabled = true;
+                facilitySelect.innerHTML = '<option value="">All Facilities</option>';
+                facilitySelect.disabled = true;
+            }
+        });
+
+        document.getElementById('filterDistrict').addEventListener('change', async function() {
+            const districtId = this.value;
+            const subcountySelect = document.getElementById('filterSubcounty');
+            const facilitySelect = document.getElementById('filterFacility');
+            if (districtId) {
+                try {
+                    const subcounties = await fetch(`${API_BASE}/subcounties/${districtId}`, {headers: getAuthHeaders()}).then(r=>r.json());
+                    subcountySelect.innerHTML = '<option value="">All Subcounties</option>';
+                    subcounties.forEach(s => {
+                        const opt = document.createElement('option');
+                        opt.value = s.id;
+                        opt.textContent = s.name;
+                        subcountySelect.appendChild(opt);
+                    });
+                    subcountySelect.disabled = false;
+                    facilitySelect.innerHTML = '<option value="">All Facilities</option>';
+                    facilitySelect.disabled = true;
+                } catch (e) {}
+            } else {
+                subcountySelect.innerHTML = '<option value="">All Subcounties</option>';
+                subcountySelect.disabled = true;
+                facilitySelect.innerHTML = '<option value="">All Facilities</option>';
+                facilitySelect.disabled = true;
+            }
+        });
+
+        document.getElementById('filterSubcounty').addEventListener('change', async function() {
+            const subcountyId = this.value;
+            const facilitySelect = document.getElementById('filterFacility');
+            if (subcountyId) {
+                try {
+                    const facilities = await fetch(`${API_BASE}/facilities/${subcountyId}`, {headers: getAuthHeaders()}).then(r=>r.json());
+                    facilitySelect.innerHTML = '<option value="">All Facilities</option>';
+                    facilities.forEach(f => {
+                        const opt = document.createElement('option');
+                        opt.value = f.id;
+                        opt.textContent = f.name;
+                        facilitySelect.appendChild(opt);
+                    });
+                    facilitySelect.disabled = false;
+                } catch (e) {}
+            } else {
+                facilitySelect.innerHTML = '<option value="">All Facilities</option>';
+                facilitySelect.disabled = true;
             }
         });
 
@@ -272,10 +578,20 @@
             }
         });
 
+        document.getElementById('filterPeriod').addEventListener('change', function() {
+            setDateRangeFromPeriod(this.value);
+        });
+
         function applyFilters() {
             filters = {
+                period: document.getElementById('filterPeriod').value || '',
+                startDate: document.getElementById('filterStartDate').value || '',
+                endDate: document.getElementById('filterEndDate').value || '',
+                healthWorkerId: document.getElementById('filterHealthWorker').value || '',
                 regionId: document.getElementById('filterRegion').value || '',
                 districtId: document.getElementById('filterDistrict').value || '',
+                subcountyId: document.getElementById('filterSubcounty').value || '',
+                facilityId: document.getElementById('filterFacility').value || '',
                 assessmentTypeId: document.getElementById('filterAssessmentType').value || '',
                 thematicAreaId: document.getElementById('filterThematicArea').value || ''
             };
@@ -283,9 +599,16 @@
         }
 
         function clearFilters() {
+            document.getElementById('filterPeriod').value = '30d';
+            setDateRangeFromPeriod('30d');
+            document.getElementById('filterHealthWorker').value = '';
             document.getElementById('filterRegion').value = '';
             document.getElementById('filterDistrict').value = '';
             document.getElementById('filterDistrict').disabled = true;
+            document.getElementById('filterSubcounty').value = '';
+            document.getElementById('filterSubcounty').disabled = true;
+            document.getElementById('filterFacility').value = '';
+            document.getElementById('filterFacility').disabled = true;
             document.getElementById('filterAssessmentType').value = '';
             document.getElementById('filterThematicArea').value = '';
             document.getElementById('filterThematicArea').disabled = true;
@@ -299,26 +622,52 @@
                 const params = new URLSearchParams();
                 if (filters.regionId && filters.regionId !== '') params.append('regionId', filters.regionId);
                 if (filters.districtId && filters.districtId !== '') params.append('districtId', filters.districtId);
+                if (filters.subcountyId && filters.subcountyId !== '') params.append('subcountyId', filters.subcountyId);
+                if (filters.facilityId && filters.facilityId !== '') params.append('facilityId', filters.facilityId);
+                if (filters.healthWorkerId && filters.healthWorkerId !== '') params.append('healthWorkerId', filters.healthWorkerId);
                 if (filters.assessmentTypeId && filters.assessmentTypeId !== '') params.append('assessmentTypeId', filters.assessmentTypeId);
                 if (filters.thematicAreaId && filters.thematicAreaId !== '') params.append('thematicAreaId', filters.thematicAreaId);
+                if (filters.startDate && filters.startDate !== '') params.append('startDate', filters.startDate);
+                if (filters.endDate && filters.endDate !== '') params.append('endDate', filters.endDate);
+                params.append('includeThematicScores', '1');
                 if (params.toString()) url += '?' + params.toString();
 
                 const resp = await fetch(url, {headers: getAuthHeaders()});
                 if (!resp.ok) throw new Error('Failed to load');
                 const data = await resp.json();
                 
-                document.getElementById('metricAssessments').textContent = data.length;
-                if (data.length) {
-                    const avg = data.reduce((sum, assessment) => sum + getAssessmentPercentage(assessment), 0) / data.length;
+                const uniqueAssessmentIds = new Set(data.map(d => d.id));
+                const uniqueAssessmentsCount = uniqueAssessmentIds.size;
+                document.getElementById('metricAssessments').textContent = uniqueAssessmentsCount;
+
+                if (uniqueAssessmentsCount) {
+                    const byId = new Map();
+                    data.forEach(a => {
+                        if (!byId.has(a.id)) byId.set(a.id, a);
+                    });
+                    const uniqueAssessments = Array.from(byId.values());
+                    const avg = uniqueAssessments.reduce((sum, assessment) => sum + Number(getOverallAssessmentPercentage(assessment)), 0) / uniqueAssessments.length;
                     document.getElementById('metricAvgScore').textContent = avg.toFixed(1) + '%';
-                    document.getElementById('metricCompetent').textContent = data.filter(a => (a.performanceLevel || a.performance_level) === 'Competent').length;
-                    document.getElementById('metricNA').textContent = data.filter(a => (a.performanceLevel || a.performance_level) === 'Not Acceptable').length;
+                    document.getElementById('metricCompetent').textContent = uniqueAssessments.filter(a => (a.performanceLevel || a.performance_level) === 'Competent').length;
+                    document.getElementById('metricNA').textContent = uniqueAssessments.filter(a => (a.performanceLevel || a.performance_level) === 'Not Acceptable').length;
                 } else {
                     document.getElementById('metricAvgScore').textContent = '0%';
                     document.getElementById('metricCompetent').textContent = '0';
                     document.getElementById('metricNA').textContent = '0';
                 }
-                const recent = data.slice(0,10).map(a => {
+                const recentItems = (() => {
+                    const seen = new Set();
+                    const items = [];
+                    for (const a of data) {
+                        if (seen.has(a.id)) continue;
+                        seen.add(a.id);
+                        items.push(a);
+                        if (items.length >= 10) break;
+                    }
+                    return items;
+                })();
+
+                const recent = recentItems.map(a => {
                     const created = a.createdAt || a.created_at;
                     const percentage = a.percentage !== undefined ? a.percentage : (a.percentageScore !== undefined ? a.percentageScore : 0);
                     const level = a.performanceLevel || a.performance_level || 'N/A';
@@ -371,87 +720,185 @@
         loadDashboard();
 
         function getAssessmentPercentage(assessment) {
-            if (assessment.percentage !== undefined && assessment.percentage !== null) {
-                return Number(assessment.percentage);
+            if (assessment.thematicPercentageScore !== undefined && assessment.thematicPercentageScore !== null) {
+                return Number(assessment.thematicPercentageScore);
             }
-            if (assessment.percentageScore !== undefined && assessment.percentageScore !== null) {
-                return Number(assessment.percentageScore);
-            }
+            if (assessment.percentage !== undefined && assessment.percentage !== null) return Number(assessment.percentage);
+            if (assessment.percentageScore !== undefined && assessment.percentageScore !== null) return Number(assessment.percentageScore);
+            return 0;
+        }
+
+        function getOverallAssessmentPercentage(assessment) {
+            if (assessment.percentage !== undefined && assessment.percentage !== null) return Number(assessment.percentage);
+            if (assessment.percentageScore !== undefined && assessment.percentageScore !== null) return Number(assessment.percentageScore);
             return 0;
         }
 
         function updateCharts(data) {
-            const thematicTotals = new Map();
-            const levelCounts = {
-                Proficient: 0,
-                Competent: 0,
-                'Not Acceptable': 0,
-            };
-            const trendTotals = new Map(); // key: YYYY-MM, value: {total, count}
+            // Reset empty state messages
+            ['thematicEmptyState', 'trendEmptyState', 'performanceEmptyState'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.classList.add('d-none');
+            });
+
+            // Group everything by thematic area label
+            const thematicTotals = new Map(); // label -> { total, count }
+            const levelByThematic = new Map(); // label -> {Proficient, Competent, 'Not Acceptable'}
+            const trendByThematic = new Map(); // label -> Map(YYYY-MM -> { total, count })
+            const allMonths = new Set();
 
             data.forEach(assessment => {
-                const type = assessment.assessmentType || assessment.assessment_type || 'Unknown';
+                const thematicLabel =
+                    assessment.thematicArea ||
+                    assessment.thematic_area ||
+                    assessment.assessmentType ||
+                    assessment.assessment_type ||
+                    'Unknown area';
+
                 const percentage = getAssessmentPercentage(assessment);
                 const level = assessment.performanceLevel || assessment.performance_level || 'Not Acceptable';
                 const created = assessment.createdAt || assessment.created_at;
 
-                if (!thematicTotals.has(type)) {
-                    thematicTotals.set(type, { total: 0, count: 0 });
+                // Overall average by thematic area
+                if (!thematicTotals.has(thematicLabel)) {
+                    thematicTotals.set(thematicLabel, { total: 0, count: 0 });
                 }
-                const thematicStat = thematicTotals.get(type);
+                const thematicStat = thematicTotals.get(thematicLabel);
                 thematicStat.total += percentage;
                 thematicStat.count += 1;
 
-                if (levelCounts[level] !== undefined) {
-                    levelCounts[level] += 1;
-                } else {
-                    levelCounts[level] = 1;
+                // Performance levels by thematic area
+                if (!levelByThematic.has(thematicLabel)) {
+                    levelByThematic.set(thematicLabel, {
+                        Proficient: 0,
+                        Competent: 0,
+                        'Not Acceptable': 0,
+                    });
                 }
+                const levelStat = levelByThematic.get(thematicLabel);
+                if (levelStat[level] === undefined) {
+                    levelStat[level] = 0;
+                }
+                levelStat[level] += 1;
 
+                // Trend data by thematic area and month
                 if (created) {
                     const date = new Date(created);
                     if (!isNaN(date.valueOf())) {
                         const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-                        if (!trendTotals.has(key)) {
-                            trendTotals.set(key, { total: 0, count: 0 });
+                        allMonths.add(key);
+                        if (!trendByThematic.has(thematicLabel)) {
+                            trendByThematic.set(thematicLabel, new Map());
                         }
-                        const trendStat = trendTotals.get(key);
-                        trendStat.total += percentage;
-                        trendStat.count += 1;
+                        const thematicTrend = trendByThematic.get(thematicLabel);
+                        if (!thematicTrend.has(key)) {
+                            thematicTrend.set(key, { total: 0, count: 0 });
+                        }
+                        const monthStat = thematicTrend.get(key);
+                        monthStat.total += percentage;
+                        monthStat.count += 1;
                     }
                 }
             });
 
             const thematicLabels = Array.from(thematicTotals.keys());
-            const thematicValues = thematicLabels.map(label => {
+
+            const MAX_BARS = 15;
+            const MAX_LINES = 6;
+
+            const sortedByVolume = thematicLabels
+                .map(label => ({ label, count: (thematicTotals.get(label)?.count || 0) }))
+                .sort((a, b) => b.count - a.count);
+
+            const barLabelsFull = sortedByVolume.slice(0, MAX_BARS).map(x => x.label);
+            const barValues = barLabelsFull.map(label => {
                 const stat = thematicTotals.get(label);
-                return stat.count ? Number((stat.total / stat.count).toFixed(1)) : 0;
+                return stat && stat.count ? Number((stat.total / stat.count).toFixed(1)) : 0;
             });
 
-            const levelLabels = Object.keys(levelCounts);
-            const levelValues = levelLabels.map(label => levelCounts[label]);
+            // Prepare performance level data per thematic area
+            const performanceLevels = ['Proficient', 'Competent', 'Not Acceptable'];
+            const performanceDatasets = performanceLevels.map(levelLabel => ({
+                label: levelLabel,
+                data: barLabelsFull.map(label => {
+                    const stat = levelByThematic.get(label);
+                    return stat ? (stat[levelLabel] || 0) : 0;
+                }),
+            }));
 
-            const sortedTrendKeys = Array.from(trendTotals.keys()).sort();
-            const trendLabels = sortedTrendKeys.map(key => {
+            // Prepare trend data: months on X axis, one line per thematic area
+            const sortedMonthKeys = Array.from(allMonths).sort();
+            const trendLabels = sortedMonthKeys.map(key => {
                 const [year, month] = key.split('-');
                 const date = new Date(Number(year), Number(month) - 1);
                 return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short' });
             });
-            const trendValues = sortedTrendKeys.map(key => {
-                const stat = trendTotals.get(key);
-                return stat.count ? Number((stat.total / stat.count).toFixed(1)) : 0;
+            const trendLineLabelsFull = sortedByVolume.slice(0, MAX_LINES).map(x => x.label);
+            const trendSeries = trendLineLabelsFull.map(label => {
+                const trendMap = trendByThematic.get(label) || new Map();
+                const seriesData = sortedMonthKeys.map(key => {
+                    const stat = trendMap.get(key);
+                    return stat && stat.count ? Number((stat.total / stat.count).toFixed(1)) : 0;
+                });
+                return { fullLabel: label, label: truncateText(label, 28), data: seriesData };
             });
 
-            renderBarChart('thematicChart', thematicLabels, thematicValues, 'Average Score (%)', 'Average Score by Assessment Type', 'thematic');
-            renderLineChart('trendChart', trendLabels, trendValues, 'Average Score (%)', 'Monthly Average Score', 'trend');
-            renderDoughnutChart('performanceChart', levelLabels, levelValues, 'Assessments', 'Performance Level Distribution', 'performance');
+            // Empty state handling
+            if (!barLabelsFull.length) {
+                const el = document.getElementById('thematicEmptyState');
+                if (el) el.classList.remove('d-none');
+            }
+            if (!sortedMonthKeys.length) {
+                const el = document.getElementById('trendEmptyState');
+                if (el) el.classList.remove('d-none');
+            }
+            const totalLevels = performanceDatasets
+                .flatMap(ds => ds.data)
+                .reduce((sum, v) => sum + v, 0);
+            if (!totalLevels) {
+                const el = document.getElementById('performanceEmptyState');
+                if (el) el.classList.remove('d-none');
+            }
+
+            renderBarChart(
+                'thematicChart',
+                barLabelsFull,
+                barValues,
+                'Average Score (%)',
+                'Average Score by Thematic Area',
+                'thematic'
+            );
+            renderMultiLineChart(
+                'trendChart',
+                trendLabels,
+                trendSeries,
+                'Average Score (%)',
+                'Monthly Average Score by Thematic Area',
+                'trend'
+            );
+            renderStackedBarChart(
+                'performanceChart',
+                barLabelsFull,
+                performanceDatasets,
+                'Assessments',
+                'Performance Level Distribution by Thematic Area',
+                'performance'
+            );
         }
 
-        function renderBarChart(canvasId, labels, data, yLabel, title, chartKey) {
+        function truncateText(text, maxLen) {
+            if (!text) return '';
+            if (text.length <= maxLen) return text;
+            return text.slice(0, Math.max(0, maxLen - 1)) + '…';
+        }
+
+        function renderBarChart(canvasId, fullLabels, data, yLabel, title, chartKey) {
             const ctx = document.getElementById(canvasId);
             if (!ctx) return;
+            const displayLabels = fullLabels.map(l => truncateText(l, 36));
             if (charts[chartKey]) {
-                charts[chartKey].data.labels = labels;
+                charts[chartKey].data.labels = displayLabels;
+                charts[chartKey].$fullLabels = fullLabels;
                 charts[chartKey].data.datasets[0].data = data;
                 charts[chartKey].update();
                 return;
@@ -459,7 +906,7 @@
             charts[chartKey] = new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels,
+                    labels: displayLabels,
                     datasets: [{
                         label: yLabel,
                         data,
@@ -468,8 +915,19 @@
                 },
                 options: {
                     responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y',
                     plugins: {
                         legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                title: (items) => {
+                                    const i = items?.[0]?.dataIndex ?? 0;
+                                    const labels = charts[chartKey]?.$fullLabels || fullLabels;
+                                    return labels[i] || '';
+                                }
+                            }
+                        },
                         title: {
                             display: false,
                             text: title,
@@ -478,19 +936,37 @@
                     scales: {
                         y: {
                             beginAtZero: true,
+                            ticks: {
+                                autoSkip: false,
+                            }
+                        },
+                        x: {
+                            beginAtZero: true,
                             max: 100,
+                            ticks: {
+                                callback: (value) => value + '%',
+                            }
                         },
                     },
                 },
             });
+            charts[chartKey].$fullLabels = fullLabels;
         }
 
-        function renderLineChart(canvasId, labels, data, yLabel, title, chartKey) {
+        function renderMultiLineChart(canvasId, labels, series, yLabel, title, chartKey) {
             const ctx = document.getElementById(canvasId);
             if (!ctx) return;
             if (charts[chartKey]) {
                 charts[chartKey].data.labels = labels;
-                charts[chartKey].data.datasets[0].data = data;
+                charts[chartKey].data.datasets = series.map((s, idx) => ({
+                    label: s.label,
+                    data: s.data,
+                    borderColor: chartLineColor(idx),
+                    backgroundColor: chartLineColor(idx),
+                    fill: false,
+                    tension: 0.3,
+                    pointRadius: 3,
+                }));
                 charts[chartKey].update();
                 return;
             }
@@ -498,20 +974,31 @@
                 type: 'line',
                 data: {
                     labels,
-                    datasets: [{
-                        label: yLabel,
-                        data,
+                    datasets: series.map((s, idx) => ({
+                        label: s.label,
+                        data: s.data,
+                        borderColor: chartLineColor(idx),
+                        backgroundColor: chartLineColor(idx),
                         fill: false,
-                        borderColor: '#198754',
                         tension: 0.3,
-                        pointRadius: 4,
-                        pointBackgroundColor: '#198754',
-                    }],
+                        pointRadius: 3,
+                    })),
                 },
                 options: {
                     responsive: true,
+                    maintainAspectRatio: false,
                     plugins: {
-                        legend: { display: false },
+                        legend: { display: true, position: 'bottom' },
+                        tooltip: {
+                            callbacks: {
+                                label: (context) => {
+                                    const ds = context.chart.data.datasets?.[context.datasetIndex];
+                                    const full = series?.[context.datasetIndex]?.fullLabel || ds?.label || '';
+                                    const v = context.parsed?.y;
+                                    return `${full}: ${Number(v).toFixed(1)}%`;
+                                }
+                            }
+                        },
                         title: {
                             display: false,
                             text: title,
@@ -521,44 +1008,80 @@
                         y: {
                             beginAtZero: true,
                             max: 100,
+                            title: {
+                                display: true,
+                                text: yLabel,
+                            },
                         },
                     },
                 },
             });
         }
 
-        function renderDoughnutChart(canvasId, labels, data, legendLabel, title, chartKey) {
+        function renderStackedBarChart(canvasId, labels, datasets, legendLabel, title, chartKey) {
             const ctx = document.getElementById(canvasId);
             if (!ctx) return;
+            const displayLabels = labels.map(l => truncateText(l, 36));
             if (charts[chartKey]) {
-                charts[chartKey].data.labels = labels;
-                charts[chartKey].data.datasets[0].data = data;
+                charts[chartKey].data.labels = displayLabels;
+                charts[chartKey].$fullLabels = labels;
+                charts[chartKey].data.datasets = datasets.map((ds, idx) => ({
+                    label: ds.label,
+                    data: ds.data,
+                    backgroundColor: chartStackColor(idx),
+                }));
                 charts[chartKey].update();
                 return;
             }
             charts[chartKey] = new Chart(ctx, {
-                type: 'doughnut',
+                type: 'bar',
                 data: {
-                    labels,
-                    datasets: [{
-                        label: legendLabel,
-                        data,
-                        backgroundColor: ['#198754', '#ffc107', '#dc3545'],
-                    }],
+                    labels: displayLabels,
+                    datasets: datasets.map((ds, idx) => ({
+                        label: ds.label,
+                        data: ds.data,
+                        backgroundColor: chartStackColor(idx),
+                    })),
                 },
                 options: {
                     responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y',
                     plugins: {
                         legend: {
                             position: 'bottom',
+                        },
+                        tooltip: {
+                            callbacks: {
+                                title: (items) => {
+                                    const i = items?.[0]?.dataIndex ?? 0;
+                                    const full = charts[chartKey]?.$fullLabels || labels;
+                                    return full[i] || '';
+                                }
+                            }
                         },
                         title: {
                             display: false,
                             text: title,
                         },
                     },
+                    scales: {
+                        x: { stacked: true, beginAtZero: true, title: { display: true, text: legendLabel } },
+                        y: { stacked: true, beginAtZero: true },
+                    },
                 },
             });
+            charts[chartKey].$fullLabels = labels;
+        }
+
+        function chartLineColor(index) {
+            const palette = ['#2563eb', '#16a34a', '#f59e0b', '#dc2626', '#0d9488', '#7c3aed'];
+            return palette[index % palette.length];
+        }
+
+        function chartStackColor(index) {
+            const palette = ['#16a34a', '#facc15', '#ef4444', '#0ea5e9', '#6366f1', '#f97316'];
+            return palette[index % palette.length];
         }
     </script>
 </body>
