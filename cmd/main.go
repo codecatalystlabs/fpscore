@@ -163,7 +163,7 @@ func main() {
 	// Hierarchy operations
 	api.Post("/hierarchy/districts/move", handlers.CheckPermission("admin.areas.manage"), handlers.MoveDistricts)
 	api.Post("/hierarchy/subcounties/move", handlers.CheckPermission("admin.areas.manage"), handlers.MoveSubcounties)
-	api.Post("/hierarchy/facilities/move", handlers.CheckPermission("admin.areas.manage"), handlers.MoveFacilities)
+	api.Post("/hierarchy/facilities/move", handlers.CheckAnyPermission("admin.areas.manage", "hierarchy.facilities.manage"), handlers.MoveFacilities)
 
 	// Reports
 	api.Get("/reports/assessments/pdf", handlers.CheckPermission("reports.export"), handlers.ExportAssessmentsPDF)
