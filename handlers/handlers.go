@@ -35,12 +35,11 @@ func GetUserAdminAreasWithDetails(c *fiber.Ctx) error {
 		return c.JSON(result)
 	}
 
-	// Get user's admin areas - we'll resolve hierarchy in code
+	// Get all user's admin areas (not just the first row)
 	rows, err := database.DB.Query(`
 		SELECT region_id, district_id, subcounty_id, facility_id
 		FROM user_admin_areas
 		WHERE user_id = $1
-		LIMIT 1
 	`, userID)
 	if err != nil {
 		fmt.Printf("ERROR: Failed to query user_admin_areas for user %d: %v\n", userID, err)
@@ -48,102 +47,132 @@ func GetUserAdminAreasWithDetails(c *fiber.Ctx) error {
 	}
 	defer rows.Close()
 
-	if rows.Next() {
+	restrictions := result["restrictions"].(map[string]interface{})
+	regionSet := map[int]bool{}
+	districtSet := map[int]bool{}
+	subcountySet := map[int]bool{}
+	facilitySet := map[int]bool{}
+
+	for rows.Next() {
 		var regionID, districtID, subcountyID, facilityID sql.NullInt64
 		if err := rows.Scan(&regionID, &districtID, &subcountyID, &facilityID); err != nil {
 			fmt.Printf("ERROR: Failed to scan user_admin_areas for user %d: %v\n", userID, err)
 			return err
 		}
-
-		restrictions := result["restrictions"].(map[string]interface{})
-
-		// Debug logging - check what we got from the database
-		fmt.Printf("DEBUG: User %d admin areas found - region: %v (%v), district: %v (%v), subcounty: %v (%v), facility: %v (%v)\n",
-			userID,
-			regionID.Valid, regionID.Int64,
-			districtID.Valid, districtID.Int64,
-			subcountyID.Valid, subcountyID.Int64,
-			facilityID.Valid, facilityID.Int64)
-
-		// Resolve hierarchy based on what's set
-		if facilityID.Valid {
-			// Get facility and its hierarchy
-			var facilityName, subcountyName, districtName, regionName string
-			var subcountyIDResolved, districtIDResolved, regionIDResolved int
-			err := database.DB.QueryRow(`
-				SELECT f.name, s.id, s.name, d.id, d.name, r.id, r.name
-				FROM facilities f
-				JOIN subcounties s ON f.subcounty_id = s.id
-				JOIN districts d ON s.district_id = d.id
-				JOIN regions r ON d.region_id = r.id
-				WHERE f.id = $1
-			`, facilityID.Int64).Scan(&facilityName, &subcountyIDResolved, &subcountyName,
-				&districtIDResolved, &districtName, &regionIDResolved, &regionName)
-			if err == nil {
-				restrictions["facilityId"] = int(facilityID.Int64)
-				restrictions["facilityName"] = facilityName
-				restrictions["subcountyId"] = subcountyIDResolved
-				restrictions["subcountyName"] = subcountyName
-				restrictions["districtId"] = districtIDResolved
-				restrictions["districtName"] = districtName
-				restrictions["regionId"] = regionIDResolved
-				restrictions["regionName"] = regionName
-				restrictions["restrictionLevel"] = "facility"
-			}
-		} else if subcountyID.Valid {
-			// Get subcounty and its hierarchy
-			var subcountyName, districtName, regionName string
-			var districtIDResolved, regionIDResolved int
-			err := database.DB.QueryRow(`
-				SELECT s.name, d.id, d.name, r.id, r.name
-				FROM subcounties s
-				JOIN districts d ON s.district_id = d.id
-				JOIN regions r ON d.region_id = r.id
-				WHERE s.id = $1
-			`, subcountyID.Int64).Scan(&subcountyName, &districtIDResolved, &districtName,
-				&regionIDResolved, &regionName)
-			if err == nil {
-				restrictions["subcountyId"] = int(subcountyID.Int64)
-				restrictions["subcountyName"] = subcountyName
-				restrictions["districtId"] = districtIDResolved
-				restrictions["districtName"] = districtName
-				restrictions["regionId"] = regionIDResolved
-				restrictions["regionName"] = regionName
-				restrictions["restrictionLevel"] = "subcounty"
-			}
-		} else if districtID.Valid {
-			// Get district and its region
-			var districtName, regionName string
-			var regionIDResolved int
-			err := database.DB.QueryRow(`
-				SELECT d.name, r.id, r.name
-				FROM districts d
-				JOIN regions r ON d.region_id = r.id
-				WHERE d.id = $1
-			`, districtID.Int64).Scan(&districtName, &regionIDResolved, &regionName)
-			if err == nil {
-				restrictions["districtId"] = int(districtID.Int64)
-				restrictions["districtName"] = districtName
-				restrictions["regionId"] = regionIDResolved
-				restrictions["regionName"] = regionName
-				restrictions["restrictionLevel"] = "district"
-			}
-		} else if regionID.Valid {
-			// Get region
-			var regionName string
-			err := database.DB.QueryRow("SELECT name FROM regions WHERE id = $1", regionID.Int64).Scan(&regionName)
-			if err == nil {
-				restrictions["regionId"] = int(regionID.Int64)
-				restrictions["regionName"] = regionName
-				restrictions["restrictionLevel"] = "region"
-			}
-		} else {
-			// Row exists but all IDs are null - this shouldn't happen but log it
-			fmt.Printf("WARNING: User %d has a row in user_admin_areas but all IDs are null\n", userID)
+		if regionID.Valid {
+			regionSet[int(regionID.Int64)] = true
 		}
-	} else {
-		// No row found for this user
-		fmt.Printf("DEBUG: User %d has no entry in user_admin_areas table\n", userID)
+		if districtID.Valid {
+			districtSet[int(districtID.Int64)] = true
+		}
+		if subcountyID.Valid {
+			subcountySet[int(subcountyID.Int64)] = true
+		}
+		if facilityID.Valid {
+			facilitySet[int(facilityID.Int64)] = true
+		}
+	}
+
+	regionIDs := make([]int, 0, len(regionSet))
+	for id := range regionSet {
+		regionIDs = append(regionIDs, id)
+	}
+	districtIDs := make([]int, 0, len(districtSet))
+	for id := range districtSet {
+		districtIDs = append(districtIDs, id)
+	}
+	subcountyIDs := make([]int, 0, len(subcountySet))
+	for id := range subcountySet {
+		subcountyIDs = append(subcountyIDs, id)
+	}
+	facilityIDs := make([]int, 0, len(facilitySet))
+	for id := range facilitySet {
+		facilityIDs = append(facilityIDs, id)
+	}
+
+	// Expose full sets so frontend can support multi-area restrictions
+	restrictions["regionIds"] = regionIDs
+	restrictions["districtIds"] = districtIDs
+	restrictions["subcountyIds"] = subcountyIDs
+	restrictions["facilityIds"] = facilityIDs
+
+	// If user has multiple admin areas at the same/higher level, do not hard-lock to a single area.
+	// API endpoints already enforce full area restrictions; this prevents UI from narrowing to only the first entry.
+	if len(facilityIDs) > 1 || len(subcountyIDs) > 1 || len(districtIDs) > 1 || len(regionIDs) > 1 {
+		return c.JSON(result)
+	}
+
+	// Single-scope restriction handling (preserve old behavior for exactly one assigned area)
+	if len(facilityIDs) == 1 {
+		facilityID := facilityIDs[0]
+		var facilityName, subcountyName, districtName, regionName string
+		var subcountyIDResolved, districtIDResolved, regionIDResolved int
+		err := database.DB.QueryRow(`
+			SELECT f.name, s.id, s.name, d.id, d.name, r.id, r.name
+			FROM facilities f
+			JOIN subcounties s ON f.subcounty_id = s.id
+			JOIN districts d ON s.district_id = d.id
+			JOIN regions r ON d.region_id = r.id
+			WHERE f.id = $1
+		`, facilityID).Scan(&facilityName, &subcountyIDResolved, &subcountyName,
+			&districtIDResolved, &districtName, &regionIDResolved, &regionName)
+		if err == nil {
+			restrictions["facilityId"] = facilityID
+			restrictions["facilityName"] = facilityName
+			restrictions["subcountyId"] = subcountyIDResolved
+			restrictions["subcountyName"] = subcountyName
+			restrictions["districtId"] = districtIDResolved
+			restrictions["districtName"] = districtName
+			restrictions["regionId"] = regionIDResolved
+			restrictions["regionName"] = regionName
+			restrictions["restrictionLevel"] = "facility"
+		}
+	} else if len(subcountyIDs) == 1 {
+		subcountyID := subcountyIDs[0]
+		var subcountyName, districtName, regionName string
+		var districtIDResolved, regionIDResolved int
+		err := database.DB.QueryRow(`
+			SELECT s.name, d.id, d.name, r.id, r.name
+			FROM subcounties s
+			JOIN districts d ON s.district_id = d.id
+			JOIN regions r ON d.region_id = r.id
+			WHERE s.id = $1
+		`, subcountyID).Scan(&subcountyName, &districtIDResolved, &districtName, &regionIDResolved, &regionName)
+		if err == nil {
+			restrictions["subcountyId"] = subcountyID
+			restrictions["subcountyName"] = subcountyName
+			restrictions["districtId"] = districtIDResolved
+			restrictions["districtName"] = districtName
+			restrictions["regionId"] = regionIDResolved
+			restrictions["regionName"] = regionName
+			restrictions["restrictionLevel"] = "subcounty"
+		}
+	} else if len(districtIDs) == 1 {
+		districtID := districtIDs[0]
+		var districtName, regionName string
+		var regionIDResolved int
+		err := database.DB.QueryRow(`
+			SELECT d.name, r.id, r.name
+			FROM districts d
+			JOIN regions r ON d.region_id = r.id
+			WHERE d.id = $1
+		`, districtID).Scan(&districtName, &regionIDResolved, &regionName)
+		if err == nil {
+			restrictions["districtId"] = districtID
+			restrictions["districtName"] = districtName
+			restrictions["regionId"] = regionIDResolved
+			restrictions["regionName"] = regionName
+			restrictions["restrictionLevel"] = "district"
+		}
+	} else if len(regionIDs) == 1 {
+		regionID := regionIDs[0]
+		var regionName string
+		err := database.DB.QueryRow("SELECT name FROM regions WHERE id = $1", regionID).Scan(&regionName)
+		if err == nil {
+			restrictions["regionId"] = regionID
+			restrictions["regionName"] = regionName
+			restrictions["restrictionLevel"] = "region"
+		}
 	}
 
 	return c.JSON(result)

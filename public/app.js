@@ -1,6 +1,7 @@
 // Main application JavaScript
 
 const API_BASE = '/api';
+const HOME_SELECTION_STORAGE_KEY = 'fp_home_selection_v1';
 
 // Log application initialization
 if (window.EventLogger) {
@@ -112,9 +113,104 @@ function setupCascadingDropdowns() {
     const healthWorkerSelect = document.getElementById('healthWorkerSelect');
     const healthWorkerSearch = document.getElementById('healthWorkerSearch');
     const healthWorkerDropdown = document.getElementById('healthWorkerDropdown');
+    let isRestoringSelection = false;
 
     if (!regionSelect || !districtSelect || !facilitySelect || !healthWorkerSelect) {
         return; // Elements don't exist on this page
+    }
+
+    function saveHomeSelectionState() {
+        if (isRestoringSelection) return;
+        const state = {
+            regionId: regionSelect.value || '',
+            districtId: districtSelect.value || '',
+            subcountyId: subcountySelect ? (subcountySelect.value || '') : '',
+            facilityId: facilitySelect.value || '',
+            selectedHealthWorker: selectedHealthWorker,
+            healthWorkerSearch: healthWorkerSearch ? (healthWorkerSearch.value || '') : ''
+        };
+        localStorage.setItem(HOME_SELECTION_STORAGE_KEY, JSON.stringify(state));
+    }
+
+    function loadHomeSelectionState() {
+        try {
+            return JSON.parse(localStorage.getItem(HOME_SELECTION_STORAGE_KEY) || '{}');
+        } catch (e) {
+            return {};
+        }
+    }
+
+    async function restoreHomeSelectionState() {
+        const saved = loadHomeSelectionState();
+        if (!saved || Object.keys(saved).length === 0) return;
+
+        isRestoringSelection = true;
+        try {
+            if (saved.regionId) {
+                regionSelect.value = saved.regionId;
+                districtSelect.disabled = false;
+                const districtsResp = await fetch(`${API_BASE}/districts/${saved.regionId}`, { headers: getAuthHeaders(null) });
+                if (districtsResp.ok) {
+                    const districts = await districtsResp.json();
+                    districtSelect.innerHTML = '<option value="">All Districts</option>';
+                    districts.forEach(district => {
+                        const option = document.createElement('option');
+                        option.value = district.id;
+                        option.textContent = district.name;
+                        districtSelect.appendChild(option);
+                    });
+                }
+            }
+            if (saved.districtId && districtSelect) {
+                districtSelect.value = saved.districtId;
+                if (subcountySelect) {
+                    subcountySelect.disabled = false;
+                    const subcountyResp = await fetch(`${API_BASE}/subcounties/${saved.districtId}`, { headers: getAuthHeaders(null) });
+                    if (subcountyResp.ok) {
+                        const subcounties = await subcountyResp.json();
+                        subcountySelect.innerHTML = '<option value="">All Subcounties</option>';
+                        subcounties.forEach(subcounty => {
+                            const option = document.createElement('option');
+                            option.value = subcounty.id;
+                            option.textContent = subcounty.name;
+                            subcountySelect.appendChild(option);
+                        });
+                    }
+                }
+            }
+            if (saved.subcountyId && subcountySelect) {
+                subcountySelect.value = saved.subcountyId;
+                facilitySelect.disabled = false;
+                const facilityResp = await fetch(`${API_BASE}/facilities/${saved.subcountyId}`, { headers: getAuthHeaders(null) });
+                if (facilityResp.ok) {
+                    const facilities = await facilityResp.json();
+                    facilitySelect.innerHTML = '<option value="">All Facilities</option>';
+                    facilities.forEach(facility => {
+                        const option = document.createElement('option');
+                        option.value = facility.id;
+                        option.textContent = facility.name;
+                        facilitySelect.appendChild(option);
+                    });
+                }
+            }
+            if (saved.facilityId) {
+                facilitySelect.value = saved.facilityId;
+            }
+
+            await loadHealthWorkers();
+
+            if (saved.selectedHealthWorker && saved.selectedHealthWorker.id) {
+                selectedHealthWorker = saved.selectedHealthWorker;
+                if (healthWorkerSearch) {
+                    healthWorkerSearch.value = saved.selectedHealthWorker.fullName || saved.healthWorkerSearch || '';
+                }
+            } else if (saved.healthWorkerSearch && healthWorkerSearch) {
+                healthWorkerSearch.value = saved.healthWorkerSearch;
+            }
+        } finally {
+            isRestoringSelection = false;
+            saveHomeSelectionState();
+        }
     }
 
     regionSelect.addEventListener('change', async function() {
@@ -164,6 +260,7 @@ function setupCascadingDropdowns() {
             clearHealthWorkerSelection();
         }
         loadHealthWorkers();
+        saveHomeSelectionState();
     });
 
     districtSelect.addEventListener('change', async function() {
@@ -214,6 +311,7 @@ function setupCascadingDropdowns() {
             clearHealthWorkerSelection();
         }
         loadHealthWorkers();
+        saveHomeSelectionState();
     });
 
     if (subcountySelect) {
@@ -247,11 +345,13 @@ function setupCascadingDropdowns() {
                 clearHealthWorkerSelection();
             }
             loadHealthWorkers();
+            saveHomeSelectionState();
         });
     }
 
     facilitySelect.addEventListener('change', function() {
         loadHealthWorkers();
+        saveHomeSelectionState();
     });
 
     // Clear health worker selection
@@ -265,6 +365,7 @@ function setupCascadingDropdowns() {
             healthWorkerDropdown.innerHTML = '';
             healthWorkerDropdown.classList.remove('show');
         }
+        saveHomeSelectionState();
     }
 
     // Filter health workers based on search input
@@ -312,6 +413,7 @@ function setupCascadingDropdowns() {
                 };
                 healthWorkerSearch.value = hw.fullName;
                 healthWorkerDropdown.classList.remove('show');
+                saveHomeSelectionState();
             });
             healthWorkerDropdown.appendChild(option);
         });
@@ -354,6 +456,17 @@ function setupCascadingDropdowns() {
             if (healthWorkerSearch && healthWorkerSearch.value.trim()) {
                 filterHealthWorkers();
             }
+
+            // Re-bind selected health worker after reload if still available
+            if (selectedHealthWorker && selectedHealthWorker.id) {
+                const match = allHealthWorkers.find(hw => hw.id === selectedHealthWorker.id);
+                if (match) {
+                    selectedHealthWorker = { ...match };
+                    if (healthWorkerSearch && !healthWorkerSearch.value.trim()) {
+                        healthWorkerSearch.value = match.fullName;
+                    }
+                }
+            }
         } catch (error) {
             console.error('Error loading health workers:', error);
         }
@@ -363,9 +476,13 @@ function setupCascadingDropdowns() {
     if (healthWorkerSearch) {
         let searchTimeout;
         healthWorkerSearch.addEventListener('input', function() {
+            if (selectedHealthWorker && this.value !== selectedHealthWorker.fullName) {
+                selectedHealthWorker = null;
+            }
             clearTimeout(searchTimeout);
             searchTimeout = setTimeout(() => {
                 filterHealthWorkers();
+                saveHomeSelectionState();
             }, 200);
         });
         
@@ -387,6 +504,7 @@ function setupCascadingDropdowns() {
 
     // Initial load of health workers
     loadHealthWorkers();
+    restoreHomeSelectionState();
 }
 
 // Load assessment types
@@ -466,6 +584,14 @@ async function loadAssessmentTypes() {
                 const facilityName = selectedHealthWorker.facilityName;
                 const typeId = this.dataset.typeId;
                 const typeCode = this.dataset.typeCode;
+                localStorage.setItem(HOME_SELECTION_STORAGE_KEY, JSON.stringify({
+                    regionId: document.getElementById('regionSelect')?.value || '',
+                    districtId: document.getElementById('districtSelect')?.value || '',
+                    subcountyId: document.getElementById('subcountySelect')?.value || '',
+                    facilityId: document.getElementById('facilitySelect')?.value || '',
+                    selectedHealthWorker: selectedHealthWorker,
+                    healthWorkerSearch: document.getElementById('healthWorkerSearch')?.value || ''
+                }));
                 
                 if (window.EventLogger) {
                     window.EventLogger.log('assessment', 'start', {
