@@ -961,22 +961,22 @@ func GetAssessments(c *fiber.Ctx) error {
 				return err
 			}
 			assessments = append(assessments, map[string]interface{}{
-				"id":                     id,
-				"createdAt":              createdAt.String,
-				"percentage":             percentage,
-				"performanceLevel":       performanceLevel,
-				"facilityName":           facilityName,
-				"assessmentType":         assessmentType,
-				"assessorName":           assessorName.String,
-				"clientName":             clientName.String,
-				"healthWorkerId":         healthWorkerID.Int64,
-				"healthWorkerName":       healthWorkerName,
-				"regionId":               regionID.Int64,
-				"districtId":             districtID.Int64,
-				"subcountyId":            subcountyID.Int64,
-				"facilityId":             facilityID.Int64,
-				"thematicAreaId":         thematicAreaID.Int64,
-				"thematicArea":           thematicAreaName.String,
+				"id":               id,
+				"createdAt":        createdAt.String,
+				"percentage":       percentage,
+				"performanceLevel": performanceLevel,
+				"facilityName":     facilityName,
+				"assessmentType":   assessmentType,
+				"assessorName":     assessorName.String,
+				"clientName":       clientName.String,
+				"healthWorkerId":   healthWorkerID.Int64,
+				"healthWorkerName": healthWorkerName,
+				"regionId":         regionID.Int64,
+				"districtId":       districtID.Int64,
+				"subcountyId":      subcountyID.Int64,
+				"facilityId":       facilityID.Int64,
+				"thematicAreaId":   thematicAreaID.Int64,
+				"thematicArea":     thematicAreaName.String,
 				"thematicPercentageScore": func() float64 {
 					if thematicPercentage.Valid {
 						return thematicPercentage.Float64
