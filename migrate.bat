@@ -1,5 +1,5 @@
 @echo off
-REM Apply SQL migrations in order against the fpscore database (Windows)
+REM Apply schema + migrations against the fpscore database (Windows)
 REM Usage: migrate.bat
 REM Optional env overrides: DB_HOST, DB_USER, DB_NAME
 
@@ -8,12 +8,15 @@ if "%DB_NAME%"=="" set DB_NAME=fpscore
 if "%DB_HOST%"=="" set DB_HOST=localhost
 
 echo ==========================================
-echo Applying migrations to %DB_NAME% @ %DB_HOST%
+echo Applying schema + migrations to %DB_NAME% @ %DB_HOST%
 echo ==========================================
 
 set FAILED=0
 
 for %%F in (
+    schema.sql
+    seed-data.sql
+    seed-questions.sql
     migration-add-health-workers.sql
     update-fp-tool-2026-04-06.sql
     role-cleanup-and-facility-hierarchy-role.sql
@@ -42,5 +45,5 @@ if "%FAILED%"=="1" (
     echo Migrations failed.
     exit /b 1
 )
-echo All available migrations applied successfully.
+echo All available schema/migrations applied successfully.
 exit /b 0
