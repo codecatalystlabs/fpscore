@@ -187,6 +187,16 @@ func ExportAssessmentsPDF(c *fiber.Ctx) error {
 		filterEndDate = endDate
 		argIdx++
 	}
+	if subcountyID := c.Query("subcountyId"); subcountyID != "" {
+		query += fmt.Sprintf(" AND s.id = $%d", argIdx)
+		args = append(args, subcountyID)
+		argIdx++
+	}
+	if performanceLevel := c.Query("performanceLevel"); performanceLevel != "" {
+		query += fmt.Sprintf(" AND a.performance_level = $%d", argIdx)
+		args = append(args, performanceLevel)
+		argIdx++
+	}
 
 	query += " ORDER BY a.created_at DESC LIMIT 500"
 
@@ -826,6 +836,16 @@ func ExportAssessmentsXLS(c *fiber.Ctx) error {
 		query += fmt.Sprintf(" AND DATE(a.created_at) <= $%d", argIdx)
 		args = append(args, endDate)
 		filterEndDate = endDate
+		argIdx++
+	}
+	if subcountyID := c.Query("subcountyId"); subcountyID != "" {
+		query += fmt.Sprintf(" AND s.id = $%d", argIdx)
+		args = append(args, subcountyID)
+		argIdx++
+	}
+	if performanceLevel := c.Query("performanceLevel"); performanceLevel != "" {
+		query += fmt.Sprintf(" AND a.performance_level = $%d", argIdx)
+		args = append(args, performanceLevel)
 		argIdx++
 	}
 

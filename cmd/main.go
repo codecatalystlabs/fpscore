@@ -128,14 +128,23 @@ func main() {
 	api.Get("/health-workers/:id/performance", handlers.CheckPermission("health_workers.view"), handlers.GetHealthWorkerPerformance)
 	api.Get("/health-workers/:id/thematic-areas/:thematicAreaId/details", handlers.CheckPermission("health_workers.view"), handlers.GetHealthWorkerThematicAreaDetails)
 
-	// Assessment routes
-	api.Get("/assessment-types", handlers.CheckPermission("assessments.view"), handlers.GetAssessmentTypes)
-	api.Get("/assessment-types/:typeId/thematic-areas", handlers.CheckPermission("assessments.view"), handlers.GetThematicAreas)
-	api.Get("/thematic-areas/:thematicAreaId/questions", handlers.CheckPermission("assessments.view"), handlers.GetQuestions)
+	// Assessment routes (FP Proficiency Score Tool)
+	api.Get("/assessment-types", handlers.CheckAnyPermission("assessments.view", "tools.proficiency.access"), handlers.GetAssessmentTypes)
+	api.Get("/assessment-types/:typeId/thematic-areas", handlers.CheckAnyPermission("assessments.view", "tools.proficiency.access"), handlers.GetThematicAreas)
+	api.Get("/thematic-areas/:thematicAreaId/questions", handlers.CheckAnyPermission("assessments.view", "tools.proficiency.access"), handlers.GetQuestions)
 	api.Post("/assessments", handlers.CheckPermission("assessments.create"), handlers.CreateAssessment)
 	api.Get("/assessments", handlers.CheckPermission("assessments.view"), handlers.GetAssessments)
 	api.Get("/assessments/:id", handlers.CheckPermission("assessments.view"), handlers.GetAssessment)
 	api.Get("/assessments/:id/summary", handlers.CheckPermission("assessments.view"), handlers.GetAssessmentSummary)
+
+	// RH SPARS routes (Integrated Reproductive Health Support Supervision Tool)
+	api.Get("/rhspars/structure", handlers.CheckAnyPermission("rhspars.view", "rhspars.create", "tools.rh_spars.access"), handlers.GetRHSParsStructure)
+	api.Get("/rhspars/domains", handlers.CheckAnyPermission("rhspars.view", "rhspars.create", "tools.rh_spars.access"), handlers.GetRHSParsDomains)
+	api.Get("/rhspars/domains/:domainId/thematic-areas", handlers.CheckAnyPermission("rhspars.view", "rhspars.create", "tools.rh_spars.access"), handlers.GetRHSParsThematicAreas)
+	api.Get("/rhspars/thematic-areas/:thematicAreaId/questions", handlers.CheckAnyPermission("rhspars.view", "rhspars.create", "tools.rh_spars.access"), handlers.GetRHSParsQuestions)
+	api.Post("/rhspars/assessments", handlers.CheckPermission("rhspars.create"), handlers.CreateRHSParsAssessment)
+	api.Get("/rhspars/assessments", handlers.CheckPermission("rhspars.view"), handlers.GetRHSParsAssessments)
+	api.Get("/rhspars/assessments/:id", handlers.CheckPermission("rhspars.view"), handlers.GetRHSParsAssessment)
 
 	// User management routes
 	api.Get("/users", handlers.CheckPermission("users.view"), handlers.GetUsers)

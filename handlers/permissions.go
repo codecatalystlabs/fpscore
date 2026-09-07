@@ -34,6 +34,14 @@ var PredefinedPermissions = []models.Permission{
 	{Code: "health_workers.edit", Description: "Edit health workers"},
 	{Code: "health_workers.delete", Description: "Delete health workers"},
 	{Code: "logs.view", Description: "View system logs"},
+	// Tool access — gates which tools appear on the post-login landing page
+	{Code: "tools.proficiency.access", Description: "Access the FP Proficiency Score Tool"},
+	{Code: "tools.rh_spars.access", Description: "Access the RH SPARS (Integrated Reproductive Health Support Supervision) Tool"},
+	// RH SPARS assessments
+	{Code: "rhspars.create", Description: "Create RH SPARS assessments"},
+	{Code: "rhspars.view", Description: "View RH SPARS assessments"},
+	{Code: "rhspars.edit", Description: "Edit RH SPARS assessments"},
+	{Code: "rhspars.delete", Description: "Delete RH SPARS assessments"},
 }
 
 // GetPredefinedPermissions returns the list of all predefined permissions
