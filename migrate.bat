@@ -24,6 +24,7 @@ for %%F in (
     seed-rhspars-questions.sql
     seed-tool-roles.sql
     migration-rhspars-scoring.sql
+    seed-users.sql
 ) do (
     if exist "%%F" (
         echo.

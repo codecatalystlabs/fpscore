@@ -48,6 +48,7 @@ FILES=(
   seed-rhspars-questions.sql
   seed-tool-roles.sql
   migration-rhspars-scoring.sql
+  seed-users.sql
 )
 
 for f in "${FILES[@]}"; do
