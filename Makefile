@@ -1,15 +1,17 @@
 .PHONY: build run clean migrate
 
+# Linux/Ubuntu binary name; on Windows use: go build -o bin/fpscore.exe ./cmd
 build:
-	go build -o bin/fpscore.exe ./cmd
+	mkdir -p bin
+	go build -o bin/fpscore ./cmd
 
 run:
 	go run ./cmd
 
-# Windows: migrate.bat   |  Unix/Git Bash: ./migrate.sh
+# Apply SQL migrations (Ubuntu/Linux). On Windows run migrate.bat instead.
 migrate:
-	migrate.bat
+	chmod +x migrate.sh
+	./migrate.sh
 
 clean:
-	rm -f bin/fpscore.exe
-
+	rm -f bin/fpscore bin/fpscore.exe
