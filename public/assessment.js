@@ -20,6 +20,7 @@ let assessmentData = {
     thematicAreas: [],
     responses: {}
 };
+let isSubmittingAssessment = false;
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
@@ -395,7 +396,16 @@ function updateProgress() {
 }
 
 // Submit assessment
-async function submitAssessment() {
+async function submitAssessment(event) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    // Guard against double-clicks / duplicate listeners posting twice
+    if (isSubmittingAssessment) {
+        return;
+    }
+
     if (window.EventLogger) {
         window.EventLogger.log('assessment', 'submit_start', {
             typeId: assessmentData.typeId,
@@ -456,7 +466,9 @@ async function submitAssessment() {
     }
     
     const submitBtn = document.getElementById('submitAssessment');
+    isSubmittingAssessment = true;
     submitBtn.disabled = true;
+    submitBtn.setAttribute('aria-busy', 'true');
     submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Submitting...';
     
     try {
@@ -504,7 +516,9 @@ async function submitAssessment() {
         }
         
         alert('Error submitting assessment. Please try again.');
+        isSubmittingAssessment = false;
         submitBtn.disabled = false;
+        submitBtn.removeAttribute('aria-busy');
         submitBtn.innerHTML = '<i class="bi bi-check-circle"></i> Submit Assessment';
     }
 }

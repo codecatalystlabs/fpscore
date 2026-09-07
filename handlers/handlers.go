@@ -642,6 +642,36 @@ func CreateAssessment(c *fiber.Ctx) error {
 	// Use the health worker's facility (they may have moved, so use current facility)
 	req.FacilityID = healthWorkerFacilityID
 
+	// Prevent double-submit: reuse a matching assessment created in the last 60 seconds
+	var existingID, existingPossible, existingAchieved int
+	var existingPct float64
+	var existingLevel string
+	err = tx.QueryRow(`
+		SELECT id, total_possible_score, achieved_score, percentage_score, COALESCE(performance_level, 'Not Acceptable')
+		FROM assessments
+		WHERE health_worker_id = $1
+		  AND facility_id = $2
+		  AND assessment_type_id = $3
+		  AND created_at >= NOW() - INTERVAL '60 seconds'
+		ORDER BY id ASC
+		LIMIT 1
+	`, req.HealthWorkerID, req.FacilityID, req.AssessmentTypeID).Scan(
+		&existingID, &existingPossible, &existingAchieved, &existingPct, &existingLevel,
+	)
+	if err == nil {
+		return c.JSON(fiber.Map{
+			"id":               existingID,
+			"totalPossible":    existingPossible,
+			"achieved":         existingAchieved,
+			"percentage":       existingPct,
+			"performanceLevel": existingLevel,
+			"deduplicated":     true,
+		})
+	}
+	if err != sql.ErrNoRows {
+		return err
+	}
+
 	// Insert assessment first (we'll update scores after processing responses)
 	var assessmentID int
 	err = tx.QueryRow(`
