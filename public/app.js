@@ -2,6 +2,11 @@
 
 const API_BASE = '/api';
 const HOME_SELECTION_STORAGE_KEY = 'fp_home_selection_v1';
+sessionStorage.setItem('active_tool', 'proficiency');
+
+function asList(data) {
+    return Array.isArray(data) ? data : [];
+}
 
 // Log application initialization
 if (window.EventLogger) {
@@ -69,7 +74,7 @@ async function loadRegions() {
             }
             throw new Error('Failed to load regions');
         }
-        const regions = await response.json();
+        const regions = asList(await response.json());
         const select = document.getElementById('regionSelect');
         if (!select) return;
         
@@ -237,7 +242,7 @@ function setupCascadingDropdowns() {
                 if (!response.ok) {
                     throw new Error('Failed to load districts');
                 }
-                const districts = await response.json();
+                const districts = asList(await response.json());
                 districtSelect.innerHTML = '<option value="">All Districts</option>';
                 districts.forEach(district => {
                     const option = document.createElement('option');
@@ -285,7 +290,7 @@ function setupCascadingDropdowns() {
                 if (!response.ok) {
                     throw new Error('Failed to load subcounties');
                 }
-                const subcounties = await response.json();
+                const subcounties = asList(await response.json());
                 if (subcountySelect) {
                     subcountySelect.innerHTML = '<option value="">All Subcounties</option>';
                     subcounties.forEach(subcounty => {
@@ -327,7 +332,7 @@ function setupCascadingDropdowns() {
                     if (!response.ok) {
                         throw new Error('Failed to load facilities');
                     }
-                    const facilities = await response.json();
+                    const facilities = asList(await response.json());
                     facilitySelect.innerHTML = '<option value="">All Facilities</option>';
                     facilities.forEach(facility => {
                         const option = document.createElement('option');
@@ -534,7 +539,7 @@ async function loadAssessmentTypes() {
             }
             throw new Error('Failed to load assessment types');
         }
-        const types = await response.json();
+        const types = asList(await response.json());
         
         // Deduplicate by id to prevent showing duplicates
         const seenIds = new Set();
@@ -548,6 +553,11 @@ async function loadAssessmentTypes() {
         
         container.innerHTML = '';
         
+        if (uniqueTypes.length === 0) {
+            container.innerHTML = '<div class="col-12 text-muted small">No assessment types available.</div>';
+            return;
+        }
+
         uniqueTypes.forEach(type => {
             const col = document.createElement('div');
             col.className = 'col-md-6 col-lg-4 mb-3';

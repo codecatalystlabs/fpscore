@@ -6,24 +6,32 @@
     <title>Facilities - Family Planning Score Tool</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="moh-theme.css" rel="stylesheet">
 </head>
-<body>
-    <div class="d-flex">
-        <div class="bg-light border-end" style="width: 260px; min-height: 100vh;">
-            <div class="p-3 border-bottom fw-bold">
-                <i class="bi bi-diagram-3"></i> Navigation
+<body class="moh-body">
+    <header class="moh-topbar">
+        <a class="moh-brand" href="tools.html">
+            <div class="moh-brand-mark"><i class="bi bi-shield-check"></i></div>
+            <div class="moh-brand-text">
+                <div class="eyebrow">Integrated Tools</div>
+                <div class="title">Ministry of Health</div>
             </div>
-            <div class="list-group list-group-flush" id="navigationItems">
-                <!-- Navigation items loaded dynamically -->
-            </div>
+        </a>
+        <div class="moh-topbar-actions">
+            <a class="moh-btn moh-btn-ghost" href="tools.html"><i class="bi bi-grid"></i> All tools</a>
+            <button type="button" class="moh-btn moh-btn-ghost" onclick="logout()"><i class="bi bi-box-arrow-right"></i> Logout</button>
         </div>
-
-        <div class="flex-grow-1">
-            <div class="p-4">
-                <div class="d-flex justify-content-between align-items-center mb-4">
-                    <div>
-                        <h3 class="mb-0"><i class="bi bi-hospital"></i> Facilities</h3>
-                        <p class="text-muted small mb-0">Manage facilities and their administrative assignments.</p>
+    </header>
+    <div class="moh-layout">
+        <aside class="moh-sidebar">
+            <div class="nav-heading">Navigation</div>
+            <div id="navigationItems"></div>
+        </aside>
+        <main class="moh-main">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                    <div class="moh-hero mb-0 flex-grow-1 me-3">
+                        <h1 class="h5 mb-1" style="color:var(--moh-green-dark)">Facilities</h1>
+                        <p class="mb-0 small text-muted">Manage facilities and their administrative assignments.</p>
                     </div>
                     <button class="btn btn-primary" id="addFacilityBtn"><i class="bi bi-plus"></i> New Facility</button>
                 </div>
@@ -43,8 +51,8 @@
 
                 <div class="tab-content mt-3" id="facilityTabsContent">
                     <div class="tab-pane fade show active" id="facilitiesTab" role="tabpanel" aria-labelledby="facilities-tab">
-                        <div class="card mb-4">
-                            <div class="card-header bg-white">
+                        <div class="card mb-4 moh-card">
+                            <div class="card-header bg-white border-0 pt-3">
                                 <strong>Filters</strong>
                             </div>
                             <div class="card-body">
@@ -78,19 +86,32 @@
                             </div>
                         </div>
 
-                        <div class="card">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <h5 class="card-title mb-0">Facilities List</h5>
-                                    <div class="text-muted" id="facilitiesCount"></div>
+                        <div class="moh-card">
+                            <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                                <div>
+                                    <h5 class="mb-0">Facilities list</h5>
+                                    <div class="text-muted small" id="facilitiesCount"></div>
                                 </div>
-                                <div id="facilitiesTableWrapper">
-                                    <div class="text-center py-5">
-                                        <div class="spinner-border text-primary" role="status">
-                                            <span class="visually-hidden">Loading...</span>
-                                        </div>
+                                <div class="d-flex align-items-center gap-2">
+                                    <label class="small text-muted mb-0">Per page</label>
+                                    <select class="form-select form-select-sm" id="facilitiesPageSize" style="width:auto">
+                                        <option value="25" selected>25</option>
+                                        <option value="50">50</option>
+                                        <option value="100">100</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div id="facilitiesTableWrapper">
+                                <div class="text-center py-5">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">Loading...</span>
                                     </div>
                                 </div>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center mt-3" id="facilitiesPager">
+                                <button type="button" class="btn btn-sm btn-outline-secondary" id="facilitiesPrevBtn" disabled>Previous</button>
+                                <span class="small" id="facilitiesPageLabel"></span>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" id="facilitiesNextBtn" disabled>Next</button>
                             </div>
                         </div>
 
@@ -246,8 +267,7 @@
                         </div>
                     </div>
                 </div>
-            </div>
-        </div>
+        </main>
     </div>
 
     <!-- Facility Modal -->
@@ -295,6 +315,7 @@
 
     <script src="event-logger.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>document.body.setAttribute('data-nav-tool', sessionStorage.getItem('active_tool') || 'proficiency');</script>
     <script src="navigation.js"></script>
     <script>
         const API_BASE = '/api';
@@ -302,6 +323,9 @@
         let facilityModal;
         let facilitiesCache = [];
         let selectedFacility = null;
+        let facilitiesPage = 1;
+        let facilitiesTotalPages = 1;
+        let facilitiesTotal = 0;
 
         document.addEventListener('DOMContentLoaded', async () => {
             if (!localStorage.getItem('token')) {
@@ -575,7 +599,7 @@
                         await populateDistricts(regionId, districtSelect, 'All Districts');
                         districtSelect.disabled = false;
                     }
-                    await loadFacilities();
+                    await loadFacilities(true);
                 });
             }
 
@@ -587,19 +611,19 @@
                         await populateSubcounties(districtId, subcountySelect, 'All Subcounties');
                         subcountySelect.disabled = false;
                     }
-                    await loadFacilities();
+                    await loadFacilities(true);
                 });
             }
 
             if (subcountySelect) {
-                subcountySelect.addEventListener('change', loadFacilities);
+                subcountySelect.addEventListener('change', () => loadFacilities(true));
             }
 
             if (searchInput) {
                 let searchTimeout;
                 searchInput.addEventListener('input', () => {
                     clearTimeout(searchTimeout);
-                    searchTimeout = setTimeout(loadFacilities, 400);
+                    searchTimeout = setTimeout(() => loadFacilities(true), 400);
                 });
             }
 
@@ -609,9 +633,26 @@
                     resetSelect(districtSelect, 'All Districts', true);
                     resetSelect(subcountySelect, 'All Subcounties', true);
                     if (searchInput) searchInput.value = '';
-                    loadFacilities();
+                    loadFacilities(true);
                 });
             }
+
+            const pageSizeEl = document.getElementById('facilitiesPageSize');
+            if (pageSizeEl) {
+                pageSizeEl.addEventListener('change', () => loadFacilities(true));
+            }
+            document.getElementById('facilitiesPrevBtn')?.addEventListener('click', () => {
+                if (facilitiesPage > 1) {
+                    facilitiesPage--;
+                    loadFacilities(false);
+                }
+            });
+            document.getElementById('facilitiesNextBtn')?.addEventListener('click', () => {
+                if (facilitiesPage < facilitiesTotalPages) {
+                    facilitiesPage++;
+                    loadFacilities(false);
+                }
+            });
         }
 
         function setupFormHandlers() {
@@ -698,7 +739,8 @@
             selectEl.disabled = true;
         }
 
-        async function loadFacilities() {
+        async function loadFacilities(resetPage) {
+            if (resetPage) facilitiesPage = 1;
             const wrapper = document.getElementById('facilitiesTableWrapper');
             const countEl = document.getElementById('facilitiesCount');
             if (!wrapper) return;
@@ -711,13 +753,16 @@
             const districtId = document.getElementById('filterDistrict')?.value;
             const subcountyId = document.getElementById('filterSubcounty')?.value;
             const search = document.getElementById('filterSearch')?.value.trim();
+            const pageSize = parseInt(document.getElementById('facilitiesPageSize')?.value || '25', 10);
 
             if (regionId) params.append('regionId', regionId);
             if (districtId) params.append('districtId', districtId);
             if (subcountyId) params.append('subcountyId', subcountyId);
             if (search) params.append('search', search);
+            params.append('page', String(facilitiesPage));
+            params.append('pageSize', String(pageSize));
 
-            const url = params.toString() ? `${API_BASE}/facilities?${params.toString()}` : `${API_BASE}/facilities`;
+            const url = `${API_BASE}/facilities?${params.toString()}`;
 
             try {
                 const response = await fetch(url, { headers: getAuthHeaders(null) });
@@ -729,8 +774,15 @@
                     throw new Error(`Failed to load facilities (${response.status})`);
                 }
 
-                const facilities = await response.json();
-                facilitiesCache = Array.isArray(facilities) ? facilities : [];
+                const payload = await response.json();
+                const facilities = Array.isArray(payload) ? payload : (payload.items || []);
+                facilitiesTotal = Array.isArray(payload) ? facilities.length : (payload.total || 0);
+                facilitiesTotalPages = Array.isArray(payload)
+                    ? 1
+                    : Math.max(1, payload.totalPages || 1);
+                if (payload.page) facilitiesPage = payload.page;
+
+                facilitiesCache = facilities;
                 if (selectedFacility) {
                     const match = facilitiesCache.find(f => f.id === selectedFacility.id);
                     if (match) {
@@ -739,10 +791,10 @@
                         selectedFacility = null;
                     }
                 }
-                if (Array.isArray(facilities) && facilities.length > 0) {
+                if (facilities.length > 0) {
                     wrapper.innerHTML = `
                         <div class="table-responsive">
-                            <table class="table table-hover align-middle">
+                            <table class="table table-hover align-middle table-sm">
                                 <thead>
                                     <tr>
                                         <th>Name</th>
@@ -791,7 +843,9 @@
                     }
 
                     if (countEl) {
-                        countEl.textContent = `${facilities.length} facility${facilities.length === 1 ? '' : 'ies'}`;
+                        const from = (facilitiesPage - 1) * pageSize + 1;
+                        const to = Math.min(facilitiesPage * pageSize, facilitiesTotal);
+                        countEl.textContent = `Showing ${from}–${to} of ${facilitiesTotal}`;
                     }
                     updateSelectedFacilityUI();
                 } else {
@@ -804,6 +858,13 @@
                         assessmentsWrapper.innerHTML = '<p class="text-muted">No facility selected.</p>';
                     }
                 }
+
+                const prevBtn = document.getElementById('facilitiesPrevBtn');
+                const nextBtn = document.getElementById('facilitiesNextBtn');
+                const pageLabel = document.getElementById('facilitiesPageLabel');
+                if (pageLabel) pageLabel.textContent = `Page ${facilitiesPage} of ${facilitiesTotalPages}`;
+                if (prevBtn) prevBtn.disabled = facilitiesPage <= 1;
+                if (nextBtn) nextBtn.disabled = facilitiesPage >= facilitiesTotalPages;
             } catch (error) {
                 console.error('Failed to load facilities:', error);
                 wrapper.innerHTML = `<div class="alert alert-danger">Error loading facilities: ${error.message}</div>`;

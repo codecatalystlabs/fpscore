@@ -215,7 +215,7 @@ func GetRegions(c *fiber.Ctx) error {
 	}
 	defer rows.Close()
 
-	var regions []map[string]interface{}
+	regions := make([]map[string]interface{}, 0)
 	for rows.Next() {
 		var id int
 		var name string
@@ -241,7 +241,7 @@ func GetDistricts(c *fiber.Ctx) error {
 	argIdx := 2
 
 	if !isAdmin {
-		_, districtIDs, _, _, err := GetUserAdminAreas(userID)
+		regionIDs, districtIDs, _, _, err := GetUserAdminAreas(userID)
 		if err != nil {
 			return err
 		}
@@ -256,8 +256,23 @@ func GetDistricts(c *fiber.Ctx) error {
 				argIdx++
 			}
 			query += fmt.Sprintf(" AND id IN (%s)", placeholders)
+		} else if len(regionIDs) > 0 {
+			regionIdInt, err := strconv.Atoi(regionId)
+			if err != nil {
+				return fiber.NewError(fiber.StatusBadRequest, "Invalid region ID")
+			}
+			allowed := false
+			for _, id := range regionIDs {
+				if id == regionIdInt {
+					allowed = true
+					break
+				}
+			}
+			if !allowed {
+				return c.JSON([]map[string]interface{}{})
+			}
+			// Region-scoped: return all districts in this region
 		} else {
-			// User has no admin areas - return empty
 			return c.JSON([]map[string]interface{}{})
 		}
 	}
@@ -270,7 +285,7 @@ func GetDistricts(c *fiber.Ctx) error {
 	}
 	defer rows.Close()
 
-	var districts []map[string]interface{}
+	districts := make([]map[string]interface{}, 0)
 	for rows.Next() {
 		var id int
 		var name string
@@ -296,7 +311,7 @@ func GetSubcounties(c *fiber.Ctx) error {
 	argIdx := 2
 
 	if !isAdmin {
-		_, districtIDs, subcountyIDs, _, err := GetUserAdminAreas(userID)
+		regionIDs, districtIDs, subcountyIDs, _, err := GetUserAdminAreas(userID)
 		if err != nil {
 			return err
 		}
@@ -315,8 +330,6 @@ func GetSubcounties(c *fiber.Ctx) error {
 			}
 			query += fmt.Sprintf(" AND id IN (%s)", placeholders)
 		} else if len(districtIDs) > 0 {
-			// User is restricted to districts but not specific subcounties
-			// Check if the requested district is in their allowed districts
 			districtIdInt, err := strconv.Atoi(districtId)
 			if err != nil {
 				return fiber.NewError(fiber.StatusBadRequest, "Invalid district ID")
@@ -329,12 +342,29 @@ func GetSubcounties(c *fiber.Ctx) error {
 				}
 			}
 			if !districtAllowed {
-				// User doesn't have access to this district
 				return c.JSON([]map[string]interface{}{})
 			}
-			// User has access to this district - return all subcounties in it (no additional filtering)
+		} else if len(regionIDs) > 0 {
+			districtIdInt, err := strconv.Atoi(districtId)
+			if err != nil {
+				return fiber.NewError(fiber.StatusBadRequest, "Invalid district ID")
+			}
+			var districtRegionID int
+			err = database.DB.QueryRow("SELECT region_id FROM districts WHERE id = $1", districtIdInt).Scan(&districtRegionID)
+			if err != nil {
+				return fiber.NewError(fiber.StatusNotFound, "District not found")
+			}
+			regionAllowed := false
+			for _, id := range regionIDs {
+				if id == districtRegionID {
+					regionAllowed = true
+					break
+				}
+			}
+			if !regionAllowed {
+				return c.JSON([]map[string]interface{}{})
+			}
 		} else {
-			// User has no admin areas - return empty
 			return c.JSON([]map[string]interface{}{})
 		}
 	}
@@ -347,7 +377,7 @@ func GetSubcounties(c *fiber.Ctx) error {
 	}
 	defer rows.Close()
 
-	var subcounties []map[string]interface{}
+	subcounties := make([]map[string]interface{}, 0)
 	for rows.Next() {
 		var id int
 		var name string
@@ -373,7 +403,7 @@ func GetFacilities(c *fiber.Ctx) error {
 	argIdx := 2
 
 	if !isAdmin {
-		_, districtIDs, subcountyIDs, facilityIDs, err := GetUserAdminAreas(userID)
+		regionIDs, districtIDs, subcountyIDs, facilityIDs, err := GetUserAdminAreas(userID)
 		if err != nil {
 			return err
 		}
@@ -435,6 +465,30 @@ func GetFacilities(c *fiber.Ctx) error {
 				return c.JSON([]map[string]interface{}{})
 			}
 			// User has access to this district - return all facilities in the subcounty (no additional filtering)
+		} else if len(regionIDs) > 0 {
+			subcountyIdInt, err := strconv.Atoi(subcountyId)
+			if err != nil {
+				return fiber.NewError(fiber.StatusBadRequest, "Invalid subcounty ID")
+			}
+			var regionID int
+			err = database.DB.QueryRow(`
+				SELECT d.region_id FROM subcounties s
+				JOIN districts d ON s.district_id = d.id
+				WHERE s.id = $1
+			`, subcountyIdInt).Scan(&regionID)
+			if err != nil {
+				return fiber.NewError(fiber.StatusNotFound, "Subcounty not found")
+			}
+			regionAllowed := false
+			for _, id := range regionIDs {
+				if id == regionID {
+					regionAllowed = true
+					break
+				}
+			}
+			if !regionAllowed {
+				return c.JSON([]map[string]interface{}{})
+			}
 		} else {
 			// User has no admin areas - return empty
 			return c.JSON([]map[string]interface{}{})
@@ -449,7 +503,7 @@ func GetFacilities(c *fiber.Ctx) error {
 	}
 	defer rows.Close()
 
-	var facilities []map[string]interface{}
+	facilities := make([]map[string]interface{}, 0)
 	for rows.Next() {
 		var id int
 		var name string
@@ -475,7 +529,7 @@ func GetAssessmentTypes(c *fiber.Ctx) error {
 
 	// Use a map to deduplicate by id in case of any duplicates
 	seenIds := make(map[int]bool)
-	var types []map[string]interface{}
+	types := make([]map[string]interface{}, 0)
 	for rows.Next() {
 		var id int
 		var name, code string
@@ -700,29 +754,22 @@ func CreateAssessment(c *fiber.Ctx) error {
 			continue
 		}
 
-		pointsEarned := 0
-		if response == "Yes" {
-			// Only "Yes" responses get points
-			pointsEarned = q.weight
-			achieved += q.weight
-			totalPossible += q.weight // Count toward total possible
+		pointsEarned, counts := ScoreQuestionResponse(response, q.weight)
+		if response != "Yes" && response != "No" && response != "NA" {
+			continue
+		}
+		if counts {
+				totalPossible += q.weight
+				if response == "Yes" {
+					achieved += q.weight
+				}
 
-			ts := thematicScores[q.thematicID]
-			ts.achieved += q.weight
-			ts.possible += q.weight // Count toward thematic possible
-			thematicScores[q.thematicID] = ts
-		} else if response == "No" {
-			// "No" responses get 0 points but still count toward possible
-			pointsEarned = 0
-			totalPossible += q.weight // Count toward total possible
-
-			ts := thematicScores[q.thematicID]
-			ts.possible += q.weight // Count toward thematic possible
-			thematicScores[q.thematicID] = ts
-		} else if response == "NA" {
-			// NA responses don't count toward possible scores at all
-			pointsEarned = 0
-			// Don't add to totalPossible or thematic possible
+				ts := thematicScores[q.thematicID]
+				ts.possible += q.weight
+				if response == "Yes" {
+					ts.achieved += q.weight
+				}
+				thematicScores[q.thematicID] = ts
 		}
 
 		// Store response
@@ -736,19 +783,8 @@ func CreateAssessment(c *fiber.Ctx) error {
 	}
 
 	// Calculate percentage and performance level
-	percentage := 0.0
-	if totalPossible > 0 {
-		percentage = (float64(achieved) / float64(totalPossible)) * 100
-	}
-
-	performanceLevel := "Not Acceptable"
-	if percentage > 90 {
-		performanceLevel = "Proficient"
-	} else if percentage >= 70 {
-		performanceLevel = "Competent"
-	} else {
-		performanceLevel = "Not Acceptable"
-	}
+	percentage := PercentageScore(achieved, totalPossible)
+	performanceLevel := PerformanceLevelFromPercentage(percentage)
 
 	_, err = tx.Exec(`
 		UPDATE assessments 
@@ -761,10 +797,7 @@ func CreateAssessment(c *fiber.Ctx) error {
 
 	// Insert thematic area scores
 	for thematicID, scores := range thematicScores {
-		taPercentage := 0.0
-		if scores.possible > 0 {
-			taPercentage = (float64(scores.achieved) / float64(scores.possible)) * 100
-		}
+		taPercentage := PercentageScore(scores.achieved, scores.possible)
 
 		_, err = tx.Exec(`
 			INSERT INTO thematic_area_scores 
@@ -958,6 +991,16 @@ func GetAssessments(c *fiber.Ctx) error {
 		args = append(args, endDate)
 		argIdx++
 	}
+	if subcountyID := c.Query("subcountyId"); subcountyID != "" {
+		query += fmt.Sprintf(" AND s.id = $%d", argIdx)
+		args = append(args, subcountyID)
+		argIdx++
+	}
+	if performanceLevel := c.Query("performanceLevel"); performanceLevel != "" {
+		query += fmt.Sprintf(" AND a.performance_level = $%d", argIdx)
+		args = append(args, performanceLevel)
+		argIdx++
+	}
 
 	query += " ORDER BY a.created_at DESC"
 
@@ -991,22 +1034,22 @@ func GetAssessments(c *fiber.Ctx) error {
 				return err
 			}
 			assessments = append(assessments, map[string]interface{}{
-				"id":                     id,
-				"createdAt":              createdAt.String,
-				"percentage":             percentage,
-				"performanceLevel":       performanceLevel,
-				"facilityName":           facilityName,
-				"assessmentType":         assessmentType,
-				"assessorName":           assessorName.String,
-				"clientName":             clientName.String,
-				"healthWorkerId":         healthWorkerID.Int64,
-				"healthWorkerName":       healthWorkerName,
-				"regionId":               regionID.Int64,
-				"districtId":             districtID.Int64,
-				"subcountyId":            subcountyID.Int64,
-				"facilityId":             facilityID.Int64,
-				"thematicAreaId":         thematicAreaID.Int64,
-				"thematicArea":           thematicAreaName.String,
+				"id":               id,
+				"createdAt":        createdAt.String,
+				"percentage":       percentage,
+				"performanceLevel": performanceLevel,
+				"facilityName":     facilityName,
+				"assessmentType":   assessmentType,
+				"assessorName":     assessorName.String,
+				"clientName":       clientName.String,
+				"healthWorkerId":   healthWorkerID.Int64,
+				"healthWorkerName": healthWorkerName,
+				"regionId":         regionID.Int64,
+				"districtId":       districtID.Int64,
+				"subcountyId":      subcountyID.Int64,
+				"facilityId":       facilityID.Int64,
+				"thematicAreaId":   thematicAreaID.Int64,
+				"thematicArea":     thematicAreaName.String,
 				"thematicPercentageScore": func() float64 {
 					if thematicPercentage.Valid {
 						return thematicPercentage.Float64

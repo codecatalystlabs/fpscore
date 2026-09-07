@@ -3,467 +3,178 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Reports - Family Planning Score Tool</title>
+    <title>Reports — Proficiency Score Tool</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="moh-theme.css" rel="stylesheet">
+    <style>
+        .report-action-tile {
+            border-left: 4px solid var(--moh-green);
+            cursor: default;
+            min-height: 110px;
+        }
+        .perf-proficient { color: #006d41; font-weight: 600; }
+        .perf-competent { color: #1a6bb5; font-weight: 600; }
+        .perf-na { color: #c0392b; font-weight: 600; }
+        #previewTableWrap { max-height: 420px; overflow: auto; }
+    </style>
 </head>
-<body>
-    <div class="d-flex">
-        <div class="bg-light border-end" style="width: 260px; min-height: 100vh;">
-            <div class="p-3 border-bottom fw-bold">
-                <i class="bi bi-diagram-3"></i> Navigation
+<body class="moh-body" data-nav-tool="proficiency">
+    <header class="moh-topbar">
+        <a class="moh-brand" href="tools.html">
+            <div class="moh-brand-mark"><i class="bi bi-shield-check"></i></div>
+            <div class="moh-brand-text">
+                <div class="eyebrow">Proficiency Score Tool</div>
+                <div class="title">Ministry of Health</div>
             </div>
-            <div class="list-group list-group-flush" id="navigationItems">
-                <!-- Navigation items will be loaded dynamically based on permissions -->
-            </div>
+        </a>
+        <div class="moh-topbar-actions">
+            <a class="moh-btn moh-btn-ghost" href="tools.html"><i class="bi bi-grid"></i> All tools</a>
+            <button type="button" class="moh-btn moh-btn-ghost" onclick="logout()"><i class="bi bi-box-arrow-right"></i> Logout</button>
         </div>
+    </header>
+    <div class="moh-layout">
+        <aside class="moh-sidebar">
+            <div class="nav-heading">Navigation</div>
+            <div id="navigationItems"></div>
+        </aside>
+        <main class="moh-main">
+            <div class="moh-page-header">
+                <div>
+                    <h1>Reports</h1>
+                    <p>Filter proficiency assessments, preview results, and export PDF or Excel.</p>
+                </div>
+                <span class="moh-badge-soft" id="matchBadge">—</span>
+            </div>
 
-        <div class="flex-grow-1">
-            <div class="p-4">
-                <h3 class="mb-4"><i class="bi bi-file-earmark-text"></i> Reports</h3>
+            <div class="moh-stat-row" id="summaryStats">
+                <div class="moh-stat"><div class="label">Matching</div><div class="value" id="statCount">0</div></div>
+                <div class="moh-stat"><div class="label">Avg score</div><div class="value" id="statAvg">—</div></div>
+                <div class="moh-stat"><div class="label">Proficient</div><div class="value" id="statProf">0</div></div>
+                <div class="moh-stat"><div class="label">Competent</div><div class="value" id="statComp">0</div></div>
+                <div class="moh-stat"><div class="label">Not acceptable</div><div class="value" id="statNA">0</div></div>
+            </div>
 
-                <div class="card mb-4">
-                    <div class="card-body">
-                        <h5 class="card-title">Export Assessments</h5>
-                        <div class="row g-3">
-                            <div class="col-md-3">
-                                <label class="form-label">Region</label>
-                                <select class="form-select" id="filterRegion">
-                                    <option value="">All Regions</option>
-                                </select>
-                            </div>
-                            <div class="col-md-3">
-                                <label class="form-label">District</label>
-                                <select class="form-select" id="filterDistrict" disabled>
-                                    <option value="">All Districts</option>
-                                </select>
-                            </div>
-                            <div class="col-md-3">
-                                <label class="form-label">Assessment Type</label>
-                                <select class="form-select" id="filterAssessmentType">
-                                    <option value="">All Types</option>
-                                </select>
-                            </div>
-                            <div class="col-md-3">
-                                <label class="form-label">Thematic Area</label>
-                                <select class="form-select" id="filterThematicArea" disabled>
-                                    <option value="">All Areas</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="row g-3 mt-2">
-                            <div class="col-md-3">
-                                <label class="form-label">Facility</label>
-                                <select class="form-select" id="filterFacility" disabled>
-                                    <option value="">All Facilities</option>
-                                </select>
-                            </div>
-                            <div class="col-md-3">
-                                <label class="form-label">Health Worker</label>
-                                <select class="form-select" id="filterHealthWorker" disabled>
-                                    <option value="">All Health Workers</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="mt-3 d-flex align-items-center">
-                            <button class="btn btn-outline-primary me-2" onclick="exportPDF()">
-                                <i class="bi bi-filetype-pdf"></i> Export PDF
-                            </button>
-                            <button class="btn btn-outline-success me-3" onclick="exportXLS()">
-                                <i class="bi bi-file-earmark-spreadsheet"></i> Export Excel
-                            </button>
-                            <button class="btn btn-sm btn-outline-secondary" type="button" onclick="clearReportFilters()">
-                                <i class="bi bi-x-circle"></i> Clear Filters
-                            </button>
-                        </div>
+            <div class="moh-card">
+                <h5>Filters</h5>
+                <div class="row g-2">
+                    <div class="col-md-2">
+                        <label class="form-label">Period</label>
+                        <select class="form-select" id="filterPeriod">
+                            <option value="30d">Last 30 days</option>
+                            <option value="90d">Last 90 days</option>
+                            <option value="ytd">Year to date</option>
+                            <option value="all" selected>All time</option>
+                            <option value="custom">Custom range</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Start date</label>
+                        <input type="date" class="form-control" id="filterStartDate">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">End date</label>
+                        <input type="date" class="form-control" id="filterEndDate">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Performance level</label>
+                        <select class="form-select" id="filterPerformance">
+                            <option value="">All levels</option>
+                            <option value="Proficient">Proficient (&gt;90%)</option>
+                            <option value="Competent">Competent (70–89%)</option>
+                            <option value="Not Acceptable">Not Acceptable (&lt;70%)</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Assessment type</label>
+                        <select class="form-select" id="filterAssessmentType">
+                            <option value="">All types</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Thematic area</label>
+                        <select class="form-select" id="filterThematicArea" disabled>
+                            <option value="">All areas</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Region</label>
+                        <select class="form-select" id="filterRegion">
+                            <option value="">All regions</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">District</label>
+                        <select class="form-select" id="filterDistrict" disabled>
+                            <option value="">All districts</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Subcounty</label>
+                        <select class="form-select" id="filterSubcounty" disabled>
+                            <option value="">All subcounties</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Facility</label>
+                        <select class="form-select" id="filterFacility" disabled>
+                            <option value="">All facilities</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Health worker</label>
+                        <select class="form-select" id="filterHealthWorker" disabled>
+                            <option value="">All health workers</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="mt-3 d-flex flex-wrap gap-2">
+                    <button type="button" class="moh-btn moh-btn-primary" id="btnPreview"><i class="bi bi-search"></i> Preview</button>
+                    <button type="button" class="moh-btn moh-btn-ghost" id="btnClear"><i class="bi bi-x-circle"></i> Clear</button>
+                    <button type="button" class="btn btn-outline-danger btn-sm" id="btnPdf"><i class="bi bi-filetype-pdf"></i> Export PDF</button>
+                    <button type="button" class="btn btn-outline-success btn-sm" id="btnXls"><i class="bi bi-file-earmark-spreadsheet"></i> Export Excel</button>
+                </div>
+            </div>
+
+            <div class="row g-2 mb-3">
+                <div class="col-md-6">
+                    <div class="moh-card report-action-tile accent-red h-100">
+                        <h3 style="font-size:0.95rem;margin:0 0 0.35rem">PDF report</h3>
+                        <p class="small text-muted mb-2">Formatted summary with scores and performance levels for printing or sharing.</p>
+                        <span class="moh-tile-cta" style="color:var(--moh-accent-red)">Uses current filters →</span>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="moh-card report-action-tile h-100" style="border-left-color:var(--moh-accent-teal)">
+                        <h3 style="font-size:0.95rem;margin:0 0 0.35rem">Excel workbook</h3>
+                        <p class="small text-muted mb-2">Row-level export for analysis, grouped with health worker and geographic detail.</p>
+                        <span class="moh-tile-cta" style="color:var(--moh-accent-teal)">Uses current filters →</span>
                     </div>
                 </div>
             </div>
-        </div>
+
+            <div class="moh-card">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h5 class="mb-0">Preview</h5>
+                    <span class="small text-muted" id="previewMeta">Click Preview to load matching assessments</span>
+                </div>
+                <div id="previewTableWrap">
+                    <p class="text-muted small mb-0">No preview loaded yet.</p>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mt-2" id="previewPager" style="display:none!important">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="prevPage" disabled>Previous</button>
+                    <span class="small" id="pageLabel"></span>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="nextPage" disabled>Next</button>
+                </div>
+            </div>
+        </main>
     </div>
 
     <script src="event-logger.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="navigation.js"></script>
-    <script>
-        // Declare API_BASE before loading admin-restrictions.js
-        window.API_BASE = '/api';
-    </script>
+    <script>window.API_BASE = '/api';</script>
     <script src="admin-restrictions.js"></script>
-    <script>
-        const API_BASE = '/api';
-        if (!localStorage.getItem('token')) {
-            window.location.href = '/';
-        }
-        function getAuthHeaders() {
-            return { 'Authorization': 'Bearer ' + localStorage.getItem('token') };
-        }
-        function logout() { localStorage.clear(); window.location.href = '/'; }
-
-        // Clear all report filters back to "All ..."
-        function clearReportFilters() {
-            const regionSelect = document.getElementById('filterRegion');
-            const districtSelect = document.getElementById('filterDistrict');
-            const facilitySelect = document.getElementById('filterFacility');
-            const healthWorkerSelect = document.getElementById('filterHealthWorker');
-            const typeSelect = document.getElementById('filterAssessmentType');
-            const thematicSelect = document.getElementById('filterThematicArea');
-
-            if (regionSelect) {
-                regionSelect.value = '';
-            }
-            if (districtSelect) {
-                districtSelect.innerHTML = '<option value=\"\">All Districts</option>';
-                districtSelect.disabled = true;
-            }
-            if (facilitySelect) {
-                facilitySelect.innerHTML = '<option value=\"\">All Facilities</option>';
-                facilitySelect.disabled = true;
-            }
-            if (healthWorkerSelect) {
-                healthWorkerSelect.innerHTML = '<option value=\"\">All Health Workers</option>';
-                healthWorkerSelect.disabled = true;
-            }
-            if (typeSelect) {
-                typeSelect.value = '';
-            }
-            if (thematicSelect) {
-                thematicSelect.innerHTML = '<option value=\"\">All Areas</option>';
-                thematicSelect.disabled = true;
-            }
-        }
-
-        let isLoadingFilters = false;
-        async function loadFilters() {
-            // Prevent concurrent calls
-            if (isLoadingFilters) {
-                return;
-            }
-            
-            isLoadingFilters = true;
-            try {
-                const [regions, types] = await Promise.all([
-                    fetch(`${API_BASE}/regions`, {headers: getAuthHeaders()}).then(r=>r.json()),
-                    fetch(`${API_BASE}/assessment-types`, {headers: getAuthHeaders()}).then(r=>r.json()),
-                ]);
-                
-                // Deduplicate regions by id
-                const seenRegionIds = new Set();
-                const uniqueRegions = regions.filter(r => {
-                    if (seenRegionIds.has(r.id)) {
-                        return false;
-                    }
-                    seenRegionIds.add(r.id);
-                    return true;
-                });
-                
-                // Deduplicate types by id
-                const seenTypeIds = new Set();
-                const uniqueTypes = types.filter(t => {
-                    if (seenTypeIds.has(t.id)) {
-                        return false;
-                    }
-                    seenTypeIds.add(t.id);
-                    return true;
-                });
-                
-                const regionSelect = document.getElementById('filterRegion');
-                if (regionSelect) {
-                    // Check if this dropdown is restricted - if so, don't clear it
-                    const isRestricted = regionSelect.disabled && regionSelect.classList.contains('bg-light');
-                    if (!isRestricted) {
-                        // Only add if not restricted
-                        const existingValues = Array.from(regionSelect.options).map(opt => opt.value);
-                        uniqueRegions.forEach(r => {
-                            if (!existingValues.includes(String(r.id))) {
-                                const opt = document.createElement('option');
-                                opt.value = r.id; opt.textContent = r.name;
-                                regionSelect.appendChild(opt);
-                            }
-                        });
-                    }
-                }
-                
-                const typeSelect = document.getElementById('filterAssessmentType');
-                if (typeSelect) {
-                    // Clear existing options except the first one (if it's "All" or empty)
-                    const firstOption = typeSelect.options[0];
-                    typeSelect.innerHTML = '';
-                    if (firstOption && (!firstOption.value || firstOption.value === '')) {
-                        typeSelect.appendChild(firstOption);
-                    }
-                    
-                    uniqueTypes.forEach(t => {
-                        const opt = document.createElement('option');
-                        opt.value = t.id; opt.textContent = t.name;
-                        typeSelect.appendChild(opt);
-                    });
-                }
-            } finally {
-                isLoadingFilters = false;
-            }
-        }
-
-        document.getElementById('filterRegion').addEventListener('change', async function() {
-            const regionId = this.value;
-            const select = document.getElementById('filterDistrict');
-            if (!regionId) { 
-                select.innerHTML = '<option value="">All Districts</option>'; 
-                select.disabled = true; 
-                document.getElementById('filterFacility').innerHTML = '<option value="">All Facilities</option>';
-                document.getElementById('filterFacility').disabled = true;
-                document.getElementById('filterHealthWorker').innerHTML = '<option value="">All Health Workers</option>';
-                document.getElementById('filterHealthWorker').disabled = true;
-                return; 
-            }
-            const districts = await fetch(`${API_BASE}/districts/${regionId}`, {headers: getAuthHeaders()}).then(r=>r.json());
-            
-            // Deduplicate districts by id
-            const seenDistrictIds = new Set();
-            const uniqueDistricts = districts.filter(d => {
-                if (seenDistrictIds.has(d.id)) {
-                    return false;
-                }
-                seenDistrictIds.add(d.id);
-                return true;
-            });
-            
-            select.innerHTML = '<option value="">All Districts</option>';
-            uniqueDistricts.forEach(d => { const opt = document.createElement('option'); opt.value=d.id; opt.textContent=d.name; select.appendChild(opt); });
-            select.disabled = false;
-        });
-
-        document.getElementById('filterDistrict').addEventListener('change', async function() {
-            const districtId = this.value;
-            const select = document.getElementById('filterFacility');
-            if (!districtId) { 
-                select.innerHTML = '<option value="">All Facilities</option>'; 
-                select.disabled = true;
-                document.getElementById('filterHealthWorker').innerHTML = '<option value="">All Health Workers</option>';
-                document.getElementById('filterHealthWorker').disabled = true;
-                return; 
-            }
-            // Get subcounties first, then facilities
-            const subcounties = await fetch(`${API_BASE}/subcounties/${districtId}`, {headers: getAuthHeaders()}).then(r=>r.json());
-            
-            // Deduplicate subcounties by id
-            const seenSubcountyIds = new Set();
-            const uniqueSubcounties = subcounties.filter(s => {
-                if (seenSubcountyIds.has(s.id)) {
-                    return false;
-                }
-                seenSubcountyIds.add(s.id);
-                return true;
-            });
-            
-            select.innerHTML = '<option value="">All Facilities</option>';
-            const seenFacilityIds = new Set();
-            for (const subcounty of uniqueSubcounties) {
-                const facilities = await fetch(`${API_BASE}/facilities/${subcounty.id}`, {headers: getAuthHeaders()}).then(r=>r.json());
-                facilities.forEach(f => {
-                    // Deduplicate facilities
-                    if (!seenFacilityIds.has(f.id)) {
-                        seenFacilityIds.add(f.id);
-                        const opt = document.createElement('option');
-                        opt.value = f.id;
-                        opt.textContent = f.name;
-                        select.appendChild(opt);
-                    }
-                });
-            }
-            select.disabled = false;
-        });
-
-        document.getElementById('filterFacility').addEventListener('change', async function() {
-            const facilityId = this.value;
-            const select = document.getElementById('filterHealthWorker');
-            if (!facilityId) { 
-                select.innerHTML = '<option value="">All Health Workers</option>'; 
-                select.disabled = true;
-                return; 
-            }
-            const healthWorkers = await fetch(`${API_BASE}/health-workers?facilityId=${facilityId}`, {headers: getAuthHeaders()}).then(r=>r.json());
-            
-            // Deduplicate health workers by id
-            const seenHwIds = new Set();
-            const uniqueHealthWorkers = healthWorkers.filter(hw => {
-                if (seenHwIds.has(hw.id)) {
-                    return false;
-                }
-                seenHwIds.add(hw.id);
-                return true;
-            });
-            
-            select.innerHTML = '<option value="">All Health Workers</option>';
-            uniqueHealthWorkers.forEach(hw => {
-                const opt = document.createElement('option');
-                opt.value = hw.id;
-                opt.textContent = hw.fullName + (hw.email ? ` (${hw.email})` : '');
-                select.appendChild(opt);
-            });
-            select.disabled = false;
-        });
-
-        document.getElementById('filterAssessmentType').addEventListener('change', async function() {
-            const typeId = this.value; const select = document.getElementById('filterThematicArea');
-            if (!typeId) { select.innerHTML = '<option value="">All Areas</option>'; select.disabled = true; return; }
-            const areas = await fetch(`${API_BASE}/assessment-types/${typeId}/thematic-areas`, {headers: getAuthHeaders()}).then(r=>r.json());
-            
-            // Deduplicate areas by id
-            const seenAreaIds = new Set();
-            const uniqueAreas = areas.filter(a => {
-                if (seenAreaIds.has(a.id)) {
-                    return false;
-                }
-                seenAreaIds.add(a.id);
-                return true;
-            });
-            
-            select.innerHTML = '<option value="">All Areas</option>';
-            uniqueAreas.forEach(a => { const opt=document.createElement('option'); opt.value=a.id; opt.textContent=a.name; select.appendChild(opt); });
-            select.disabled = false;
-        });
-
-        // Make exportPDF available globally
-        window.exportPDF = async function() {
-            try {
-                const params = new URLSearchParams();
-                const r = document.getElementById('filterRegion').value;
-                const d = document.getElementById('filterDistrict').value;
-                const f = document.getElementById('filterFacility').value;
-                const hw = document.getElementById('filterHealthWorker').value;
-                const t = document.getElementById('filterAssessmentType').value;
-                const a = document.getElementById('filterThematicArea').value;
-                if (r) params.append('regionId', r);
-                if (d) params.append('districtId', d);
-                if (f) params.append('facilityId', f);
-                if (hw) params.append('healthWorkerId', hw);
-                if (t) params.append('assessmentTypeId', t);
-                if (a) params.append('thematicAreaId', a);
-
-                const url = `${API_BASE}/reports/assessments/pdf?` + params.toString();
-                console.log('Exporting PDF from:', url);
-                const resp = await fetch(url, { headers: getAuthHeaders() });
-                
-                if (!resp.ok) {
-                    const errorText = await resp.text();
-                    console.error('PDF export failed:', resp.status, errorText);
-                    alert('Failed to export PDF: ' + (errorText || resp.statusText));
-                    return;
-                }
-                
-                const blob = await resp.blob();
-                console.log('PDF blob received, size:', blob.size, 'bytes, type:', blob.type);
-                
-                if (blob.size === 0) {
-                    alert('The exported PDF file is empty. There may be no assessments matching your filters.');
-                    return;
-                }
-                
-                if (blob.type !== 'application/pdf' && blob.type !== '') {
-                    console.warn('Unexpected content type:', blob.type);
-                }
-                
-                const link = document.createElement('a');
-                link.href = URL.createObjectURL(blob);
-                link.download = 'assessments-report-' + new Date().toISOString().slice(0,10) + '.pdf';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                
-                // Clean up the object URL after a delay
-                setTimeout(() => URL.revokeObjectURL(link.href), 100);
-            } catch (error) {
-                console.error('Error exporting PDF:', error);
-                alert('Error exporting PDF: ' + error.message);
-            }
-        };
-
-        // Make exportXLS available globally
-        window.exportXLS = async function() {
-            try {
-                const params = new URLSearchParams();
-                const r = document.getElementById('filterRegion').value;
-                const d = document.getElementById('filterDistrict').value;
-                const f = document.getElementById('filterFacility').value;
-                const hw = document.getElementById('filterHealthWorker').value;
-                const t = document.getElementById('filterAssessmentType').value;
-                const a = document.getElementById('filterThematicArea').value;
-                if (r) params.append('regionId', r);
-                if (d) params.append('districtId', d);
-                if (f) params.append('facilityId', f);
-                if (hw) params.append('healthWorkerId', hw);
-                if (t) params.append('assessmentTypeId', t);
-                if (a) params.append('thematicAreaId', a);
-
-                const url = `${API_BASE}/reports/assessments/xls?` + params.toString();
-                console.log('Exporting XLS from:', url);
-                const resp = await fetch(url, { headers: getAuthHeaders() });
-                
-                if (!resp.ok) {
-                    const errorText = await resp.text();
-                    console.error('XLS export failed:', resp.status, errorText);
-                    alert('Failed to export Excel: ' + (errorText || resp.statusText));
-                    return;
-                }
-                
-                const blob = await resp.blob();
-                console.log('XLS blob received, size:', blob.size, 'bytes, type:', blob.type);
-                
-                if (blob.size === 0) {
-                    alert('The exported Excel file is empty. There may be no assessments matching your filters.');
-                    return;
-                }
-                
-                const link = document.createElement('a');
-                link.href = URL.createObjectURL(blob);
-                link.download = 'assessments-report-' + new Date().toISOString().slice(0,10) + '.xlsx';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                
-                // Clean up the object URL after a delay
-                setTimeout(() => URL.revokeObjectURL(link.href), 100);
-            } catch (error) {
-                console.error('Error exporting Excel:', error);
-                alert('Error exporting Excel: ' + error.message);
-            }
-        };
-
-        loadFilters().then(() => {
-            // Apply restrictions after filters are loaded (only for non-admin users)
-            setTimeout(async () => {
-                if (typeof window.applyAdminRestrictions === 'function') {
-                    // Check admin status first before applying restrictions
-                    try {
-                        const token = localStorage.getItem('token');
-                        const headers = {};
-                        if (token) {
-                            headers['Authorization'] = `Bearer ${token}`;
-                        }
-                        const response = await fetch('/api/user/admin-areas', { headers });
-                        if (response.ok) {
-                            const data = await response.json();
-                            const isAdmin = data.isAdmin === true || data.isAdmin === 1 || data.isAdmin === "true";
-                            if (!isAdmin) {
-                                // Only apply restrictions if user is not admin
-                                // Reset the flag so restrictions can be reapplied
-                                if (window.restrictionsApplied !== undefined) {
-                                    window.restrictionsApplied = false;
-                                }
-                                window.applyAdminRestrictions();
-                            } else {
-                                console.log('Admin user detected - skipping restrictions');
-                            }
-                        }
-                    } catch (e) {
-                        console.error('Error checking admin status:', e);
-                    }
-                }
-            }, 300);
-        });
-    </script>
+    <script src="reports.js"></script>
 </body>
 </html>
-
-

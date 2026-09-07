@@ -6,13 +6,8 @@
     <title>View Assessment - Family Planning Score Tool</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="moh-theme.css" rel="stylesheet">
     <style>
-        .header-section {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 1.5rem 0;
-            margin-bottom: 2rem;
-        }
         .score-card {
             text-align: center;
             padding: 2rem;
@@ -54,25 +49,39 @@
         }
     </style>
 </head>
-<body>
-    <div class="header-section">
-        <div class="container">
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <h4 class="mb-0">
+<body class="moh-body" data-nav-tool="proficiency">
+    <header class="moh-topbar">
+        <a class="moh-brand" href="tools.html">
+            <div class="moh-brand-mark"><i class="bi bi-shield-check"></i></div>
+            <div class="moh-brand-text">
+                <div class="eyebrow">Proficiency Score Tool</div>
+                <div class="title">Ministry of Health</div>
+            </div>
+        </a>
+        <div class="moh-topbar-actions">
+            <a class="moh-btn moh-btn-ghost" href="tools.html"><i class="bi bi-grid"></i> All tools</a>
+            <button type="button" class="moh-btn moh-btn-ghost" onclick="logout()"><i class="bi bi-box-arrow-right"></i> Logout</button>
+        </div>
+    </header>
+    <div class="moh-layout">
+        <aside class="moh-sidebar">
+            <div class="nav-heading">Navigation</div>
+            <div id="navigationItems"></div>
+        </aside>
+        <main class="moh-main">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div class="moh-hero mb-0 flex-grow-1 me-3">
+                    <h1 class="h5 mb-0" style="color:var(--moh-green-dark)">
                         <i class="bi bi-clipboard-data"></i> Assessment Details
-                    </h4>
+                    </h1>
                 </div>
-                <a href="home.html" class="btn btn-light btn-sm">
+                <a href="home.html" class="moh-btn moh-btn-ghost">
                     <i class="bi bi-arrow-left"></i> Back
                 </a>
             </div>
-        </div>
-    </div>
 
-    <div class="container">
         <!-- Assessment Info -->
-        <div class="card mb-4">
+        <div class="moh-card mb-4">
             <div class="card-body">
                 <h5 class="card-title">Assessment Information</h5>
                 <div class="row">
@@ -159,6 +168,7 @@
                 </div>
             </div>
         </div>
+        </main>
     </div>
 
     <script src="event-logger.js"></script>
