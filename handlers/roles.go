@@ -193,6 +193,14 @@ func DeletePermission(c *fiber.Ctx) error {
 func GetUserPermissionsHandler(c *fiber.Ctx) error {
 	userID := c.Locals("userID").(int)
 
+	if IsAdmin(userID) {
+		out := make([]models.Permission, 0, len(PredefinedPermissions))
+		for _, p := range PredefinedPermissions {
+			out = append(out, p)
+		}
+		return c.JSON(out)
+	}
+
 	rows, err := database.DB.Query(`
 		SELECT DISTINCT p.id, p.code, p.description 
 		FROM permissions p
@@ -206,7 +214,7 @@ func GetUserPermissionsHandler(c *fiber.Ctx) error {
 	}
 	defer rows.Close()
 
-	var permissions []models.Permission
+	permissions := make([]models.Permission, 0)
 	for rows.Next() {
 		var p models.Permission
 		if err := rows.Scan(&p.ID, &p.Code, &p.Description); err == nil {

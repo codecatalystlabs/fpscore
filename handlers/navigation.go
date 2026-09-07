@@ -1,31 +1,28 @@
 package handlers
 
 import (
+	"strings"
+
 	"github.com/gofiber/fiber/v2"
 )
 
 // NavigationItem represents a navigation menu item
 type NavigationItem struct {
-	Label    string `json:"label"`
-	URL      string `json:"url"`
-	Icon     string `json:"icon"`
-	Required string `json:"required"` // permission code required
+	Label string `json:"label"`
+	URL   string `json:"url"`
+	Icon  string `json:"icon"`
 }
 
-// GetNavigationItems returns navigation items based on user permissions
+// GetNavigationItems returns nav items for the selected tool only.
+// Query: ?tool=proficiency | rhspars (required for tool pages; empty returns []).
 func GetNavigationItems(c *fiber.Ctx) error {
 	userID := c.Locals("userID").(int)
-
-	// Check if user is admin (has admin role or all permissions)
 	isAdmin := IsAdmin(userID)
-
-	// Get all user permissions
 	permissions, err := GetUserPermissions(userID)
 	if err != nil {
 		permissions = []string{}
 	}
 
-	// Helper to check if user has permission
 	hasPermission := func(code string) bool {
 		if isAdmin {
 			return true
@@ -38,77 +35,104 @@ func GetNavigationItems(c *fiber.Ctx) error {
 		return false
 	}
 
+	tool := strings.ToLower(strings.TrimSpace(c.Query("tool")))
 	items := []NavigationItem{}
 
-	// Home - always visible if authenticated
-	items = append(items, NavigationItem{
-		Label: "Home",
-		URL:   "home.html",
-		Icon:  "bi-house",
-	})
-
-	// Dashboard - needs dashboard.view
-	if hasPermission("dashboard.view") || hasPermission("assessments.view") {
+	// Always offer a way back to the tile picker when inside a tool
+	if tool == "proficiency" || tool == "rhspars" {
 		items = append(items, NavigationItem{
-			Label: "Dashboard",
-			URL:   "dashboard.html",
-			Icon:  "bi-speedometer2",
+			Label: "All tools",
+			URL:   "tools.html",
+			Icon:  "bi-grid-3x3-gap",
 		})
 	}
 
-	// Reports - needs reports.view
-	if hasPermission("reports.view") || hasPermission("reports.export") {
+	switch tool {
+	case "proficiency":
+		if !hasPermission("tools.proficiency.access") && !hasPermission("assessments.view") && !hasPermission("assessments.create") {
+			return c.JSON(items)
+		}
 		items = append(items, NavigationItem{
-			Label: "Reports",
-			URL:   "reports.html",
-			Icon:  "bi-file-earmark-text",
+			Label: "Assessments",
+			URL:   "home.html",
+			Icon:  "bi-clipboard-check",
 		})
+		if hasPermission("dashboard.view") || hasPermission("assessments.view") {
+			items = append(items, NavigationItem{
+				Label: "Dashboard",
+				URL:   "dashboard.html",
+				Icon:  "bi-speedometer2",
+			})
+		}
+		if hasPermission("reports.view") || hasPermission("reports.export") {
+			items = append(items, NavigationItem{
+				Label: "Reports",
+				URL:   "reports.html",
+				Icon:  "bi-file-earmark-text",
+			})
+		}
+		if hasPermission("health_workers.view") || hasPermission("health_workers.create") {
+			items = append(items, NavigationItem{
+				Label: "Health Workers",
+				URL:   "health-workers.html",
+				Icon:  "bi-person-badge",
+			})
+		}
+		appendAdminNav(&items, hasPermission)
+
+	case "rhspars":
+		if !hasPermission("tools.rh_spars.access") && !hasPermission("rhspars.view") && !hasPermission("rhspars.create") {
+			return c.JSON(items)
+		}
+		items = append(items, NavigationItem{
+			Label: "New visit",
+			URL:   "rhspars-home.html",
+			Icon:  "bi-hospital",
+		})
+		if hasPermission("rhspars.view") {
+			items = append(items, NavigationItem{
+				Label: "History",
+				URL:   "rhspars-history.html",
+				Icon:  "bi-clock-history",
+			})
+		}
+		appendAdminNav(&items, hasPermission)
+
+	default:
+		// tools.html and unknown contexts: no sidebar items
+		return c.JSON([]NavigationItem{})
 	}
 
-	// Users - needs users.view
+	return c.JSON(items)
+}
+
+func appendAdminNav(items *[]NavigationItem, hasPermission func(string) bool) {
 	if hasPermission("users.view") {
-		items = append(items, NavigationItem{
+		*items = append(*items, NavigationItem{
 			Label: "Users",
 			URL:   "users.html",
 			Icon:  "bi-people",
 		})
 	}
-
-	// Roles - needs roles.view
 	if hasPermission("roles.view") {
-		items = append(items, NavigationItem{
-			Label: "Roles",
+		*items = append(*items, NavigationItem{
+			Label: "Roles & permissions",
 			URL:   "roles.html",
 			Icon:  "bi-shield-check",
 		})
 	}
-
-	// Facilities - needs facilities.view or admin.areas.view
 	if hasPermission("facilities.view") || hasPermission("admin.areas.view") {
-		items = append(items, NavigationItem{
-			Label: "Facilities",
+		*items = append(*items, NavigationItem{
+			Label: "Geography & facilities",
 			URL:   "facilities.html",
-			Icon:  "bi-hospital",
+			Icon:  "bi-geo-alt",
 		})
 	}
-
-	// Health Workers - needs health_workers.view
-	if hasPermission("health_workers.view") || hasPermission("health_workers.create") {
-		items = append(items, NavigationItem{
-			Label: "Health Workers",
-			URL:   "health-workers.html",
-			Icon:  "bi-person-badge",
-		})
-	}
-
-	// Logs - needs logs.view
 	if hasPermission("logs.view") {
-		items = append(items, NavigationItem{
-			Label: "System Logs",
+		*items = append(*items, NavigationItem{
+			Label: "Audit Trail",
 			URL:   "logs.html",
 			Icon:  "bi-journal-text",
 		})
 	}
-
-	return c.JSON(items)
 }

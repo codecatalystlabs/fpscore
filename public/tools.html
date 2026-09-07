@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RH Tools — Ministry of Health</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="moh-theme.css" rel="stylesheet">
+</head>
+<body class="moh-body">
+    <header class="moh-topbar">
+        <div class="moh-brand">
+            <div class="moh-brand-mark"><i class="bi bi-shield-check"></i></div>
+            <div class="moh-brand-text">
+                <div class="eyebrow">Integrated RH Tools</div>
+                <div class="title">Ministry of Health</div>
+            </div>
+        </div>
+        <div class="moh-topbar-actions">
+            <span class="moh-badge-soft" id="signedInAs">Signed in</span>
+            <button type="button" class="moh-btn moh-btn-ghost" onclick="logout()"><i class="bi bi-box-arrow-right"></i> Logout</button>
+        </div>
+    </header>
+
+    <main class="moh-main" style="max-width: 920px; margin: 0 auto; padding-top: 1.75rem;">
+        <div class="moh-page-header">
+            <div>
+                <h1>Select a tool</h1>
+                <p>Choose the Proficiency Score Tool or RH SPARS to continue. Access depends on your assigned roles and permissions.</p>
+            </div>
+            <span class="moh-badge-soft" id="pathwayCount">Loading…</span>
+        </div>
+
+        <div class="moh-tile-grid" id="toolTiles" style="grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));">
+            <div class="text-muted small">Checking your tool access…</div>
+        </div>
+
+        <div id="noAccess" class="moh-card d-none mt-3">
+            <h5>No tool access assigned</h5>
+            <p class="mb-0 text-muted small">Your account does not have permission for the Proficiency Score Tool or RH SPARS. Ask an administrator to grant <code>tools.proficiency.access</code> and/or <code>tools.rh_spars.access</code>.</p>
+        </div>
+    </main>
+
+    <script>
+        function logout() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            sessionStorage.removeItem('rhspars_draft');
+            window.location.href = '/';
+        }
+
+        if (!localStorage.getItem('token')) {
+            window.location.href = '/';
+        }
+
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        document.getElementById('signedInAs').textContent = user.name || user.email || 'Signed in';
+
+        async function loadTools() {
+            const token = localStorage.getItem('token');
+            const res = await fetch('/api/users/me/permissions', {
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+            if (!res.ok) {
+                if (res.status === 401) { logout(); return; }
+                document.getElementById('toolTiles').innerHTML = '<div class="text-danger">Failed to load permissions.</div>';
+                return;
+            }
+            const perms = await res.json();
+            const list = (Array.isArray(perms) ? perms : [])
+                .map(p => (typeof p === 'string' ? p : p.code))
+                .filter(Boolean);
+            const has = (code) => list.includes(code);
+
+            const tools = [];
+            if (has('tools.proficiency.access') || has('assessments.create') || has('assessments.view')) {
+                tools.push({
+                    href: 'home.html',
+                    accent: 'accent-red',
+                    icon: 'bi-clipboard2-pulse',
+                    title: 'Proficiency Score Tool',
+                    desc: 'Score provider competence on counselling, injectables, implants, IUDs, and related FP clinical procedures.',
+                    cta: 'Open tool →'
+                });
+            }
+            if (has('tools.rh_spars.access') || has('rhspars.create') || has('rhspars.view')) {
+                tools.push({
+                    href: 'rhspars-home.html',
+                    accent: 'accent-blue',
+                    icon: 'bi-clipboard2-data',
+                    title: 'RH SPARS Tool',
+                    desc: 'Integrated Reproductive Health Support Supervision — maternity, FP, ANC, commodities, health information, and general facility.',
+                    cta: 'Open tool →'
+                });
+            }
+
+            document.getElementById('pathwayCount').textContent =
+                tools.length + ' tool' + (tools.length === 1 ? '' : 's') + ' available';
+
+            const grid = document.getElementById('toolTiles');
+            if (tools.length === 0) {
+                grid.innerHTML = '';
+                document.getElementById('noAccess').classList.remove('d-none');
+                return;
+            }
+
+            grid.innerHTML = tools.map(t => `
+                <a class="moh-tile ${t.accent}" href="${t.href}">
+                    <div class="moh-tile-icon"><i class="bi ${t.icon}"></i></div>
+                    <h3>${t.title}</h3>
+                    <p>${t.desc}</p>
+                    <span class="moh-tile-cta">${t.cta}</span>
+                </a>
+            `).join('');
+        }
+
+        loadTools();
+    </script>
+</body>
+</html>

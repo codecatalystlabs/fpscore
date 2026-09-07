@@ -117,11 +117,22 @@ func ListFacilities(c *fiber.Ctx) error {
 
 	query += " ORDER BY r.name, d.name, sc.name, f.name"
 
-	rows, err := database.DB.Query(query, args...)
-	if err != nil {
-		return err
+	// Optional pagination: ?page=1&pageSize=25
+	page := 1
+	pageSize := 0
+	if v := c.Query("page"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			page = n
+		}
 	}
-	defer rows.Close()
+	if v := c.Query("pageSize"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			pageSize = n
+			if pageSize > 200 {
+				pageSize = 200
+			}
+		}
+	}
 
 	type facilityResponse struct {
 		ID            int    `json:"id"`
@@ -135,7 +146,53 @@ func ListFacilities(c *fiber.Ctx) error {
 		CreatedAt     string `json:"createdAt"`
 	}
 
-	var facilities []facilityResponse
+	if pageSize > 0 {
+		countQuery := "SELECT COUNT(*) FROM (" + query + ") AS filtered"
+		var total int
+		if err := database.DB.QueryRow(countQuery, args...).Scan(&total); err != nil {
+			return err
+		}
+		offset := (page - 1) * pageSize
+		pagedQuery := query + fmt.Sprintf(" LIMIT $%d OFFSET $%d", argIdx, argIdx+1)
+		pagedArgs := append(append([]interface{}{}, args...), pageSize, offset)
+
+		rows, err := database.DB.Query(pagedQuery, pagedArgs...)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+
+		items := make([]facilityResponse, 0)
+		for rows.Next() {
+			var item facilityResponse
+			var createdAt sql.NullString
+			if err := rows.Scan(&item.ID, &item.Name, &item.SubcountyID, &item.SubcountyName, &item.DistrictID, &item.DistrictName, &item.RegionID, &item.RegionName, &createdAt); err != nil {
+				return err
+			}
+			item.CreatedAt = createdAt.String
+			items = append(items, item)
+		}
+
+		totalPages := 0
+		if total > 0 {
+			totalPages = (total + pageSize - 1) / pageSize
+		}
+		return c.JSON(fiber.Map{
+			"items":      items,
+			"total":      total,
+			"page":       page,
+			"pageSize":   pageSize,
+			"totalPages": totalPages,
+		})
+	}
+
+	rows, err := database.DB.Query(query, args...)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	facilities := make([]facilityResponse, 0)
 	for rows.Next() {
 		var item facilityResponse
 		var createdAt sql.NullString

@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>RH SPARS Visit</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+
+    <link href="moh-theme.css" rel="stylesheet">
+
+</head>
+
+<body class="moh-body" data-nav-tool="rhspars">
+
+    <header class="moh-topbar">
+
+        <a class="moh-brand" href="tools.html">
+
+            <div class="moh-brand-mark"><i class="bi bi-shield-check"></i></div>
+
+            <div class="moh-brand-text">
+
+                <div class="eyebrow">RH SPARS</div>
+
+                <div class="title">Visit summary</div>
+
+            </div>
+
+        </a>
+
+        <div class="moh-topbar-actions">
+
+            <a class="moh-btn moh-btn-ghost" href="rhspars-history.html">History</a>
+
+            <a class="moh-btn moh-btn-primary" href="rhspars-home.html">New visit</a>
+
+        </div>
+
+    </header>
+
+
+
+    <div class="moh-layout">
+
+        <aside class="moh-sidebar">
+
+            <div class="nav-heading">Navigation</div>
+
+            <div id="navigationItems"></div>
+
+        </aside>
+
+        <main class="moh-main">
+
+            <div id="content">Loading…</div>
+
+        </main>
+
+    </div>
+
+
+
+    <script src="navigation.js"></script>
+
+    <script src="scoring-utils.js"></script>
+
+    <script>
+
+        if (!localStorage.getItem('token')) window.location.href = '/';
+
+        const id = new URLSearchParams(location.search).get('id');
+
+        if (!id) location.href = 'rhspars-history.html';
+
+
+
+        fetch('/api/rhspars/assessments/' + id, { headers: authHeaders() })
+
+            .then(r => { if (!r.ok) throw new Error('Not found'); return r.json(); })
+
+            .then(data => {
+
+                const a = data.assessment;
+
+                const domains = data.domainScores || [];
+
+                const sections = data.sectionScores || [];
+
+                const grand = Number(a.grandPercentage);
+
+                const level = a.performanceLevel || performanceLevelFromPct(grand);
+
+                const cardClass = performanceCardClass(grand);
+
+
+
+                document.getElementById('content').innerHTML = `
+
+                    <div class="moh-page-header">
+
+                        <div>
+
+                            <h1>${a.facilityName}</h1>
+
+                            <p>${a.supervisionType || ''} · ${a.supervisionDate || a.createdAt?.slice?.(0,10) || ''}</p>
+
+                        </div>
+
+                    </div>
+
+                    <div class="score-card ${cardClass}">
+
+                        <h2 class="h4 mb-2">${level}</h2>
+
+                        <h1 class="display-5 mb-2">${grand.toFixed(1)}%</h1>
+
+                        <p class="mb-0 small">${a.achieved || 0} / ${a.totalPossible || 0} points · Grand score (mean of 6 domains)</p>
+
+                    </div>
+
+                    <div class="moh-stat-row">
+
+                        ${domains.map(d => {
+
+                            const dp = Number(d.percentage);
+
+                            const dl = d.performanceLevel || performanceLevelFromPct(dp);
+
+                            return `
+
+                            <div class="moh-stat">
+
+                                <div class="label">${d.name}</div>
+
+                                <div class="value">${dp.toFixed(1)}%</div>
+
+                                <span class="badge ${performanceBadgeClass(dl)} mt-1">${dl}</span>
+
+                            </div>`;
+
+                        }).join('')}
+
+                    </div>
+
+                    <div class="moh-card">
+
+                        <h5>Section scores</h5>
+
+                        <table class="table table-sm">
+
+                            <thead><tr><th>Domain</th><th>Section</th><th>Achieved</th><th>Possible</th><th>%</th><th>Level</th></tr></thead>
+
+                            <tbody>
+
+                                ${sections.map(s => {
+
+                                    const sp = Number(s.percentage);
+
+                                    const sl = s.performanceLevel || performanceLevelFromPct(sp);
+
+                                    return `<tr>
+
+                                    <td>${s.domainCode}</td>
+
+                                    <td>${s.name}</td>
+
+                                    <td>${s.achieved}</td>
+
+                                    <td>${s.possible}</td>
+
+                                    <td><strong>${sp.toFixed(1)}</strong></td>
+
+                                    <td><span class="badge ${performanceBadgeClass(sl)}">${sl}</span></td>
+
+                                </tr>`;
+
+                                }).join('')}
+
+                            </tbody>
+
+                        </table>
+
+                    </div>
+
+                    ${(data.actionPlan || []).length ? `
+
+                    <div class="moh-card">
+
+                        <h5>Action plan</h5>
+
+                        <table class="table table-sm">
+
+                            <thead><tr><th>Gap</th><th>Action</th><th>MoV</th><th>Responsible</th><th>Timeframe</th></tr></thead>
+
+                            <tbody>
+
+                                ${data.actionPlan.map(ap => `<tr>
+
+                                    <td>${ap.gapIdentified || ''}</td>
+
+                                    <td>${ap.actionRecommendation || ''}</td>
+
+                                    <td>${ap.meansOfVerification || ''}</td>
+
+                                    <td>${ap.responsiblePerson || ''}</td>
+
+                                    <td>${ap.timeFrame || ''}</td>
+
+                                </tr>`).join('')}
+
+                            </tbody>
+
+                        </table>
+
+                    </div>` : ''}
+
+                    <div class="moh-card">
+
+                        <h5>Responses (${(data.responses||[]).length})</h5>
+
+                        <div style="max-height:420px;overflow:auto">
+
+                            <table class="table table-sm">
+
+                                <thead><tr><th>Section</th><th>Question</th><th>Response</th><th>Pts</th></tr></thead>
+
+                                <tbody>
+
+                                    ${(data.responses||[]).map(r => `<tr>
+
+                                        <td class="small text-muted">${r.thematicAreaName}</td>
+
+                                        <td>${r.questionText}</td>
+
+                                        <td>${r.response}</td>
+
+                                        <td>${r.pointsEarned}</td>
+
+                                    </tr>`).join('')}
+
+                                </tbody>
+
+                            </table>
+
+                        </div>
+
+                    </div>
+
+                `;
+
+            })
+
+            .catch(err => {
+
+                document.getElementById('content').innerHTML = '<div class="alert alert-danger">'+err.message+'</div>';
+
+            });
+
+    </script>
+
+</body>
+
+</html>
+

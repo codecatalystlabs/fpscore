@@ -6,11 +6,9 @@
 *.dylib
 *.test
 *.out
-*.sql
-*.md
-*.yaml
-*.bat
-*.sh
+
+# Archives
+*.zip
 
 # Go workspace file
 go.work
