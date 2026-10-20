@@ -97,6 +97,13 @@
 
             document.getElementById('pathwayCount').textContent =
                 tools.length + ' tool' + (tools.length === 1 ? '' : 's') + ' available';
+            const header = document.querySelector('.moh-page-header p');
+            if (tools.length === 1) {
+                if (header) header.textContent = 'Opening your assigned tool…';
+                window.location.replace(tools[0].href);
+                return;
+            }
+            if (header) header.textContent = 'Choose ' + tools.map(t => t.title).join(' or ') + ' to continue.';
 
             const grid = document.getElementById('toolTiles');
             if (tools.length === 0) {

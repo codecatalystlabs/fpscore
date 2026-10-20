@@ -39,12 +39,14 @@ type RHSParsCreateRequest struct {
 	Responses                map[string]string `json:"responses"` // question_id -> Yes/No/NA
 	Attendees                []struct {
 		PersonType    string `json:"personType"`
+		DomainID      int    `json:"domainId"`
 		FullName      string `json:"fullName"`
 		CadrePosition string `json:"cadrePosition"`
 		Affiliation   string `json:"affiliation"`
 		Contact       string `json:"contact"`
 	} `json:"attendees"`
 	ActionPlan []struct {
+		DomainID             int    `json:"domainId"`
 		GapIdentified        string `json:"gapIdentified"`
 		ActionRecommendation string `json:"actionRecommendation"`
 		MeansOfVerification  string `json:"meansOfVerification"`
@@ -255,9 +257,9 @@ func CreateRHSParsAssessment(c *fiber.Ctx) error {
 			continue
 		}
 		_, err = tx.Exec(`
-			INSERT INTO rhspars_attendees (assessment_id, person_type, full_name, cadre_position, affiliation, contact)
-			VALUES ($1,$2,$3,$4,$5,$6)
-		`, assessmentID, a.PersonType, a.FullName, a.CadrePosition, a.Affiliation, a.Contact)
+			INSERT INTO rhspars_attendees (assessment_id, person_type, domain_id, full_name, cadre_position, affiliation, contact)
+			VALUES ($1,$2,NULLIF($3,0),$4,$5,$6,$7)
+		`, assessmentID, a.PersonType, a.DomainID, a.FullName, a.CadrePosition, a.Affiliation, a.Contact)
 		if err != nil {
 			return err
 		}
@@ -269,9 +271,9 @@ func CreateRHSParsAssessment(c *fiber.Ctx) error {
 		}
 		_, err = tx.Exec(`
 			INSERT INTO rhspars_action_plan_items
-			(assessment_id, gap_identified, action_recommendation, means_of_verification, responsible_person, time_frame, display_order)
-			VALUES ($1,$2,$3,$4,$5,$6,$7)
-		`, assessmentID, ap.GapIdentified, ap.ActionRecommendation, ap.MeansOfVerification, ap.ResponsiblePerson, ap.TimeFrame, i+1)
+			(assessment_id, domain_id, gap_identified, action_recommendation, means_of_verification, responsible_person, time_frame, display_order)
+			VALUES ($1,NULLIF($2,0),$3,$4,$5,$6,$7,$8)
+		`, assessmentID, ap.DomainID, ap.GapIdentified, ap.ActionRecommendation, ap.MeansOfVerification, ap.ResponsiblePerson, ap.TimeFrame, i+1)
 		if err != nil {
 			return err
 		}
@@ -445,12 +447,13 @@ func GetRHSParsAssessments(c *fiber.Ctx) error {
 	isAdmin := IsAdmin(userID)
 
 	query := `
-		SELECT a.id, a.supervision_date, a.grand_percentage,
+		SELECT a.id, a.supervision_type, a.supervision_date, a.grand_percentage,
 		       a.maternity_pct, a.fp_pct, a.anc_pct, a.commodities_pct,
 		       a.health_info_pct, a.general_facility_pct,
 		       a.total_possible_score, a.achieved_score, a.performance_level,
-		       f.name as facility_name, a.created_at,
-		       r.id as region_id, d.id as district_id
+		       f.id, f.name as facility_name,
+		       s.name as subcounty_name, d.id, d.name as district_name,
+		       r.id, r.name as region_name, a.created_at
 		FROM rhspars_assessments a
 		JOIN facilities f ON a.facility_id = f.id
 		JOIN subcounties s ON f.subcounty_id = s.id
@@ -531,20 +534,20 @@ func GetRHSParsAssessments(c *fiber.Ctx) error {
 
 	out := make([]map[string]interface{}, 0)
 	for rows.Next() {
-		var id int
-		var supervisionDate, createdAt sql.NullString
+		var id, facilityID, districtID, regionID int
+		var supervisionType, supervisionDate, createdAt sql.NullString
 		var grand, mat, fp, anc, com, hi, gf float64
 		var totalPossible, achieved int
-		var performanceLevel string
-		var facilityName string
-		var regionID, districtID sql.NullInt64
-		if err := rows.Scan(&id, &supervisionDate, &grand, &mat, &fp, &anc, &com, &hi, &gf,
+		var performanceLevel, facilityName, subcountyName, districtName, regionName string
+		if err := rows.Scan(&id, &supervisionType, &supervisionDate, &grand, &mat, &fp, &anc, &com, &hi, &gf,
 			&totalPossible, &achieved, &performanceLevel,
-			&facilityName, &createdAt, &regionID, &districtID); err != nil {
+			&facilityID, &facilityName, &subcountyName, &districtID, &districtName,
+			&regionID, &regionName, &createdAt); err != nil {
 			return err
 		}
 		out = append(out, map[string]interface{}{
 			"id": id,
+			"supervisionType": supervisionType.String,
 			"supervisionDate": supervisionDate.String,
 			"grandPercentage": grand,
 			"maternityPct": mat,
@@ -556,7 +559,13 @@ func GetRHSParsAssessments(c *fiber.Ctx) error {
 			"totalPossible": totalPossible,
 			"achieved": achieved,
 			"performanceLevel": performanceLevel,
+			"facilityId": facilityID,
 			"facilityName": facilityName,
+			"subcountyName": subcountyName,
+			"districtId": districtID,
+			"districtName": districtName,
+			"regionId": regionID,
+			"regionName": regionName,
 			"createdAt": createdAt.String,
 		})
 	}
@@ -715,8 +724,12 @@ func GetRHSParsAssessment(c *fiber.Ctx) error {
 	}
 
 	apRows, err := database.DB.Query(`
-		SELECT gap_identified, action_recommendation, means_of_verification, responsible_person, time_frame
-		FROM rhspars_action_plan_items WHERE assessment_id = $1 ORDER BY display_order, id
+		SELECT ap.gap_identified, ap.action_recommendation, ap.means_of_verification, ap.responsible_person, ap.time_frame,
+		       COALESCE(d.name, '')
+		FROM rhspars_action_plan_items ap
+		LEFT JOIN rhspars_domains d ON ap.domain_id = d.id
+		WHERE ap.assessment_id = $1
+		ORDER BY d.display_order NULLS LAST, ap.display_order, ap.id
 	`, id)
 	if err != nil {
 		return err
@@ -725,12 +738,40 @@ func GetRHSParsAssessment(c *fiber.Ctx) error {
 	actionPlan := make([]map[string]interface{}, 0)
 	for apRows.Next() {
 		var gap, action, mov, person, tf sql.NullString
-		if err := apRows.Scan(&gap, &action, &mov, &person, &tf); err != nil {
+		var domainName string
+		if err := apRows.Scan(&gap, &action, &mov, &person, &tf, &domainName); err != nil {
 			return err
 		}
 		actionPlan = append(actionPlan, map[string]interface{}{
+			"domainName": domainName,
 			"gapIdentified": gap.String, "actionRecommendation": action.String,
 			"meansOfVerification": mov.String, "responsiblePerson": person.String, "timeFrame": tf.String,
+		})
+	}
+
+	attendeeRows, err := database.DB.Query(`
+		SELECT a.person_type, a.full_name, a.cadre_position, a.affiliation, a.contact, COALESCE(d.name, '')
+		FROM rhspars_attendees a
+		LEFT JOIN rhspars_domains d ON a.domain_id = d.id
+		WHERE a.assessment_id = $1
+		ORDER BY d.display_order NULLS LAST, a.id
+	`, id)
+	if err != nil {
+		return err
+	}
+	defer attendeeRows.Close()
+	attendees := make([]map[string]interface{}, 0)
+	for attendeeRows.Next() {
+		var personType string
+		var name, cadre, affiliation, contact sql.NullString
+		var domainName string
+		if err := attendeeRows.Scan(&personType, &name, &cadre, &affiliation, &contact, &domainName); err != nil {
+			return err
+		}
+		attendees = append(attendees, map[string]interface{}{
+			"personType": personType, "domainName": domainName,
+			"fullName": name.String, "cadrePosition": cadre.String,
+			"affiliation": affiliation.String, "contact": contact.String,
 		})
 	}
 
@@ -768,6 +809,7 @@ func GetRHSParsAssessment(c *fiber.Ctx) error {
 		"domainScores": domainScores,
 		"sectionScores": sectionScores,
 		"responses": responses,
+		"attendees": attendees,
 		"actionPlan": actionPlan,
 	})
 }

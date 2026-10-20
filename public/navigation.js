@@ -64,6 +64,17 @@ async function loadNavigation() {
             ? '<i class="bi bi-box-arrow-right"></i><span>Logout</span>'
             : '<i class="bi bi-box-arrow-right me-2"></i> Logout';
         navContainer.appendChild(logoutLink);
+
+        const canSwitchTools = items.some(item => item.url === 'tools.html');
+        document.querySelectorAll('a[href="tools.html"]').forEach(link => {
+            if (canSwitchTools) return;
+            if (link.classList.contains('moh-btn') || link.querySelector('.bi-grid')) {
+                link.style.display = 'none';
+                return;
+            }
+            const activeTool = document.body.getAttribute('data-nav-tool') || '';
+            link.href = activeTool === 'rhspars' ? 'rhspars-home.html' : 'home.html';
+        });
     } catch (error) {
         console.error('Error loading navigation:', error);
     }

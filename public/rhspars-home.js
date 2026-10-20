@@ -16,11 +16,48 @@ function saveDraft(patch) {
     return draft;
 }
 
+function areaKind(area) {
+    const name = (area.name || '').toLowerCase();
+    if (name.includes('health information system')) return 'his';
+    if (name.includes('infrastructure')) return 'infra';
+    return 'normal';
+}
+
+function areasShownFor(domain) {
+    const own = domain.thematicAreas || [];
+    if (domain.code === 'health_information') {
+        const registers = [];
+        domainsCache.forEach(d => {
+            if (d.code === 'anc' || d.code === 'maternity' || d.code === 'fp') {
+                (d.thematicAreas || []).forEach(area => {
+                    if (areaKind(area) === 'his') registers.push(area);
+                });
+            }
+        });
+        return registers.concat(own);
+    }
+    if (domain.code === 'general_facility') {
+        const infra = [];
+        domainsCache.forEach(d => {
+            if (d.code === 'anc' || d.code === 'maternity' || d.code === 'fp') {
+                (d.thematicAreas || []).forEach(area => {
+                    if (areaKind(area) === 'infra') infra.push(area);
+                });
+            }
+        });
+        return infra.concat(own);
+    }
+    if (domain.code === 'anc' || domain.code === 'maternity' || domain.code === 'fp') {
+        return own.filter(area => areaKind(area) === 'normal');
+    }
+    return own;
+}
+
 function answeredCountForDomain(draft, domain) {
     const responses = draft.responses || {};
     let total = 0;
     let answered = 0;
-    (domain.thematicAreas || []).forEach(ta => {
+    areasShownFor(domain).forEach(ta => {
         (ta.questions || []).forEach(q => {
             total++;
             if (responses[String(q.id)] || responses[q.id]) answered++;
@@ -45,8 +82,109 @@ function fillSelect(el, items, placeholder, selectedValue) {
     if (selectedValue) el.value = String(selectedValue);
 }
 
+function todayISO() {
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+function plusDaysISO(iso, days) {
+    const d = new Date(iso + 'T00:00:00');
+    d.setDate(d.getDate() + days);
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+function escAttr(value) {
+    return String(value || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+}
+
+function personRow(person) {
+    const p = person || {};
+    return `<div class="person-row border rounded p-2 mb-2">
+        <input class="form-control form-control-sm mb-1 p-name" placeholder="Name" value="${escAttr(p.fullName)}">
+        <input class="form-control form-control-sm mb-1 p-cadre" placeholder="Cadre / position" value="${escAttr(p.cadrePosition)}">
+        <input class="form-control form-control-sm mb-1 p-aff" placeholder="Affiliation" value="${escAttr(p.affiliation)}">
+        <div class="d-flex gap-1">
+            <input class="form-control form-control-sm p-contact" placeholder="Contact" value="${escAttr(p.contact)}">
+            <button type="button" class="btn btn-sm btn-outline-danger remove-row">×</button>
+        </div>
+    </div>`;
+}
+
+function actionRow(item) {
+    const a = item || {};
+    return `<div class="row g-1 action-row mb-2">
+        <div class="col-md-3"><input class="form-control form-control-sm ap-gap" placeholder="Gap identified" value="${escAttr(a.gapIdentified)}"></div>
+        <div class="col-md-3"><input class="form-control form-control-sm ap-action" placeholder="Action" value="${escAttr(a.actionRecommendation)}"></div>
+        <div class="col-md-2"><input class="form-control form-control-sm ap-mov" placeholder="Means of verification" value="${escAttr(a.meansOfVerification)}"></div>
+        <div class="col-md-2"><input class="form-control form-control-sm ap-person" placeholder="Responsible person" value="${escAttr(a.responsiblePerson)}"></div>
+        <div class="col-md-1"><input class="form-control form-control-sm ap-time" placeholder="Time frame" value="${escAttr(a.timeFrame)}"></div>
+        <div class="col-md-1"><button type="button" class="btn btn-sm btn-outline-danger remove-row">×</button></div>
+    </div>`;
+}
+
+function collectPeople(listId, personType) {
+    return [...document.querySelectorAll('#' + listId + ' .person-row')].map(row => ({
+        personType,
+        fullName: row.querySelector('.p-name').value.trim(),
+        cadrePosition: row.querySelector('.p-cadre').value.trim(),
+        affiliation: row.querySelector('.p-aff').value.trim(),
+        contact: row.querySelector('.p-contact').value.trim()
+    })).filter(p => p.fullName || p.cadrePosition || p.affiliation || p.contact);
+}
+
+function flattenDomainAttendees(draft) {
+    const extras = draft.domainExtras || {};
+    const rows = [];
+    Object.keys(extras).forEach(domainId => {
+        const extra = extras[domainId] || {};
+        (extra.present || []).forEach(p => {
+            if (p.fullName) rows.push({ ...p, personType: 'present', domainId: parseInt(domainId, 10) });
+        });
+        (extra.supervisors || []).forEach(p => {
+            if (p.fullName) rows.push({ ...p, personType: 'supervisor', domainId: parseInt(domainId, 10) });
+        });
+    });
+    return rows;
+}
+
+function flattenDomainActionPlans(draft) {
+    const extras = draft.domainExtras || {};
+    const rows = [];
+    Object.keys(extras).forEach(domainId => {
+        ((extras[domainId] || {}).actionPlan || []).forEach(item => {
+            if (Object.values(item).some(Boolean)) {
+                rows.push({ ...item, domainId: parseInt(domainId, 10) });
+            }
+        });
+    });
+    return rows;
+}
+
+function collectActionPlan() {
+    return [...document.querySelectorAll('#actionPlanList .action-row')].map(row => ({
+        gapIdentified: row.querySelector('.ap-gap').value.trim(),
+        actionRecommendation: row.querySelector('.ap-action').value.trim(),
+        meansOfVerification: row.querySelector('.ap-mov').value.trim(),
+        responsiblePerson: row.querySelector('.ap-person').value.trim(),
+        timeFrame: row.querySelector('.ap-time').value.trim()
+    })).filter(a => Object.values(a).some(Boolean));
+}
+
+function renderPeople() {
+    const draft = getDraft();
+    const people = draft.attendees || [];
+    const present = people.filter(p => p.personType === 'present');
+    const supervisors = people.filter(p => p.personType === 'supervisor');
+    document.getElementById('presentList').innerHTML = (present.length ? present : [{}]).map(personRow).join('');
+    document.getElementById('supervisorList').innerHTML = (supervisors.length ? supervisors : [{}]).map(personRow).join('');
+    const actions = draft.actionPlan && draft.actionPlan.length ? draft.actionPlan : [{}];
+    document.getElementById('actionPlanList').innerHTML = actions.map(actionRow).join('');
+}
+
 function syncVisitFieldsToDraft() {
     const facilityEl = document.getElementById('facilitySelect');
+    const observation = getDraft().observationNotes || {};
+    const observationText = Object.values(observation).filter(Boolean).join('\n');
     saveDraft({
         regionId: document.getElementById('regionSelect').value || '',
         districtId: document.getElementById('districtSelect').value || '',
@@ -56,11 +194,17 @@ function syncVisitFieldsToDraft() {
         supervisionType: document.getElementById('supervisionType').value,
         supervisionDate: document.getElementById('supervisionDate').value,
         nextSupervisionDate: document.getElementById('nextSupervisionDate').value,
+        assessmentCompletionDate: document.getElementById('assessmentCompletionDate').value,
         rhSupplier: document.getElementById('rhSupplier').value,
         facilityTypeDetail: document.getElementById('facilityTypeDetail').value,
         facilityOwnership: document.getElementById('facilityOwnership').value,
         primaryContactName: document.getElementById('primaryContactName').value,
-        primaryContactPhone: document.getElementById('primaryContactPhone').value
+        primaryContactPhone: document.getElementById('primaryContactPhone').value,
+        primaryContactEmail: document.getElementById('primaryContactEmail').value,
+        completedByName: document.getElementById('completedByName').value,
+        completedByDesignation: document.getElementById('completedByDesignation').value,
+        completedByInstitution: document.getElementById('completedByInstitution').value,
+        notes: observationText
     });
     renderDomainCards();
 }
@@ -83,8 +227,10 @@ function renderDomainCards() {
         return;
     }
 
+    const domainRank = { anc: 1, maternity: 2, fp: 3, commodities: 4, health_information: 5, general_facility: 6 };
+    const orderedDomains = [...domainsCache].sort((a, b) => (domainRank[a.code] || 99) - (domainRank[b.code] || 99));
     let domainsDone = 0;
-    box.innerHTML = domainsCache.map(d => {
+    box.innerHTML = orderedDomains.map(d => {
         const { total, answered } = answeredCountForDomain(draft, d);
         let status = 'Not started';
         let cls = '';
@@ -108,7 +254,7 @@ function renderDomainCards() {
                         <span class="small text-muted">${status}</span>
                     </div>
                     <h3 class="mt-2 mb-1" style="font-size:0.95rem">${d.name}</h3>
-                    <p class="small text-muted mb-2">${(d.thematicAreas || []).length} thematic areas</p>
+                    <p class="small text-muted mb-2">${areasShownFor(d).length} thematic areas</p>
                     <span class="moh-tile-cta" style="color:var(--moh-accent-blue)">Open thematic areas →</span>
                 </div>
             </div>`;
@@ -145,7 +291,14 @@ async function initGeo() {
     const regions = await api('/api/regions');
     fillSelect(regionSelect, regions, 'Select region', draft.regionId);
 
-    ['supervisionType','supervisionDate','nextSupervisionDate','rhSupplier','facilityTypeDetail','facilityOwnership','primaryContactName','primaryContactPhone']
+    const today = todayISO();
+    const supervisionDate = document.getElementById('supervisionDate');
+    supervisionDate.value = today;
+    supervisionDate.readOnly = true;
+    document.getElementById('nextSupervisionDate').min = plusDaysISO(today, 1);
+    if (!draft.assessmentCompletionDate) document.getElementById('assessmentCompletionDate').value = today;
+
+    ['supervisionType','nextSupervisionDate','assessmentCompletionDate','rhSupplier','facilityTypeDetail','facilityOwnership','primaryContactName','primaryContactPhone','primaryContactEmail','completedByName','completedByDesignation','completedByInstitution']
         .forEach(id => {
             const el = document.getElementById(id);
             if (el && draft[id]) el.value = draft[id];
@@ -224,8 +377,28 @@ async function initGeo() {
 document.getElementById('submitVisitBtn').addEventListener('click', async function() {
     syncVisitFieldsToDraft();
     const draft = getDraft();
-    if (!draft.facilityId) {
-        alert('Select a facility.');
+    const missing = [];
+    [
+        ['facilityId', 'Facility'],
+        ['supervisionType', 'Supervision type'],
+        ['supervisionDate', 'Supervision date'],
+        ['nextSupervisionDate', 'Next supervision date'],
+        ['assessmentCompletionDate', 'Assessment completion date'],
+        ['rhSupplier', 'RH supplier / warehouse'],
+        ['facilityTypeDetail', 'Facility type'],
+        ['facilityOwnership', 'Facility ownership'],
+        ['primaryContactName', 'Primary contact person at site'],
+        ['primaryContactPhone', 'Telephone'],
+        ['primaryContactEmail', 'Email'],
+        ['completedByName', 'Completed by name'],
+        ['completedByDesignation', 'Designation'],
+        ['completedByInstitution', 'Institution / organisation']
+    ].forEach(([key, label]) => { if (!draft[key]) missing.push(label); });
+    if (draft.nextSupervisionDate && draft.supervisionDate && draft.nextSupervisionDate <= draft.supervisionDate) {
+        missing.push('Next supervision date must be after the supervision date');
+    }
+    if (missing.length) {
+        alert('Complete the visit details before submitting:\n• ' + missing.join('\n• '));
         return;
     }
     const responses = draft.responses || {};
@@ -259,14 +432,15 @@ document.getElementById('submitVisitBtn').addEventListener('click', async functi
             facilityOwnership: draft.facilityOwnership,
             primaryContactName: draft.primaryContactName,
             primaryContactPhone: draft.primaryContactPhone,
+            primaryContactEmail: draft.primaryContactEmail,
             completedByName: draft.completedByName || '',
             completedByDesignation: draft.completedByDesignation || '',
             completedByInstitution: draft.completedByInstitution || '',
             assessmentCompletionDate: draft.assessmentCompletionDate || '',
             notes: draft.notes || '',
             responses,
-            actionPlan: draft.actionPlan || [],
-            attendees: draft.attendees || []
+            actionPlan: flattenDomainActionPlans(draft),
+            attendees: flattenDomainAttendees(draft)
         };
         const res = await fetch('/api/rhspars/assessments', {
             method: 'POST',

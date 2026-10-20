@@ -122,10 +122,25 @@
 
                         <h1 class="display-5 mb-2">${grand.toFixed(1)}%</h1>
 
-                        <p class="mb-0 small">${a.achieved || 0} / ${a.totalPossible || 0} points · Grand score (mean of 6 domains)</p>
+                        <p class="mb-0 small">${a.achieved || 0} / ${a.totalPossible || 0} points · Grand facility percentage score</p>
 
                     </div>
 
+                    <div class="moh-card">
+                        <h5>Facility score</h5>
+                        <table class="table table-sm mb-0">
+                            <thead><tr><th>SNo</th><th>Indicator / building block</th><th>Average percentage score</th></tr></thead>
+                            <tbody>
+                                <tr><td>1</td><td>Maternity services</td><td><strong>${Number(a.maternityPct).toFixed(1)}%</strong></td></tr>
+                                <tr><td>2</td><td>Family planning services</td><td><strong>${Number(a.fpPct).toFixed(1)}%</strong></td></tr>
+                                <tr><td>3</td><td>Antenatal care services</td><td><strong>${Number(a.ancPct).toFixed(1)}%</strong></td></tr>
+                                <tr><td>4</td><td>Drugs and supplies</td><td><strong>${Number(a.commoditiesPct).toFixed(1)}%</strong></td></tr>
+                                <tr><td>5</td><td>Health information</td><td><strong>${Number(a.healthInfoPct).toFixed(1)}%</strong></td></tr>
+                                <tr><td>6</td><td>General facility</td><td><strong>${Number(a.generalFacilityPct).toFixed(1)}%</strong></td></tr>
+                                <tr><td></td><td><strong>Grand facility percentage score</strong></td><td><strong>${grand.toFixed(1)}%</strong></td></tr>
+                            </tbody>
+                        </table>
+                    </div>
                     <div class="moh-stat-row">
 
                         ${domains.map(d => {
@@ -190,6 +205,23 @@
 
                     </div>
 
+                    ${(data.attendees || []).length ? `
+                    <div class="moh-card">
+                        <h5>Individuals present and supervisors</h5>
+                        <table class="table table-sm">
+                            <thead><tr><th>Domain</th><th>Role</th><th>Name</th><th>Cadre / position</th><th>Affiliation</th><th>Contact</th></tr></thead>
+                            <tbody>
+                                ${(data.attendees || []).map(p => `<tr>
+                                    <td>${p.domainName || ''}</td>
+                                    <td>${p.personType === 'supervisor' ? 'Supervisor' : 'Present'}</td>
+                                    <td>${p.fullName || ''}</td>
+                                    <td>${p.cadrePosition || ''}</td>
+                                    <td>${p.affiliation || ''}</td>
+                                    <td>${p.contact || ''}</td>
+                                </tr>`).join('')}
+                            </tbody>
+                        </table>
+                    </div>` : ''}
                     ${(data.actionPlan || []).length ? `
 
                     <div class="moh-card">
@@ -198,12 +230,13 @@
 
                         <table class="table table-sm">
 
-                            <thead><tr><th>Gap</th><th>Action</th><th>MoV</th><th>Responsible</th><th>Timeframe</th></tr></thead>
+                            <thead><tr><th>Domain</th><th>Gap</th><th>Action</th><th>MoV</th><th>Responsible</th><th>Timeframe</th></tr></thead>
 
                             <tbody>
 
                                 ${data.actionPlan.map(ap => `<tr>
 
+                                    <td>${ap.domainName || ''}</td>
                                     <td>${ap.gapIdentified || ''}</td>
 
                                     <td>${ap.actionRecommendation || ''}</td>

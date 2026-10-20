@@ -64,6 +64,7 @@ CREATE TABLE IF NOT EXISTS rhspars_attendees (
     id SERIAL PRIMARY KEY,
     assessment_id INTEGER NOT NULL REFERENCES rhspars_assessments(id) ON DELETE CASCADE,
     person_type VARCHAR(20) NOT NULL, -- 'present' | 'supervisor'
+    domain_id INTEGER REFERENCES rhspars_domains(id) ON DELETE SET NULL,
     full_name TEXT,
     cadre_position TEXT,
     affiliation TEXT,
@@ -101,6 +102,7 @@ CREATE TABLE IF NOT EXISTS rhspars_domain_scores (
 CREATE TABLE IF NOT EXISTS rhspars_action_plan_items (
     id SERIAL PRIMARY KEY,
     assessment_id INTEGER NOT NULL REFERENCES rhspars_assessments(id) ON DELETE CASCADE,
+    domain_id INTEGER REFERENCES rhspars_domains(id) ON DELETE SET NULL,
     gap_identified TEXT,
     action_recommendation TEXT,
     means_of_verification TEXT,

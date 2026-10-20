@@ -17,6 +17,8 @@
         .resp-btns .btn.active-no { background:#c0392b; border-color:#c0392b; color:#fff; }
         .resp-btns .btn.active-na { background:#6c757d; border-color:#6c757d; color:#fff; }
         .progress-bar { background:var(--moh-green); }
+        .moh-hero.score-sticky { position: sticky; top: 0; z-index: 30; background: #f7faf8; border-bottom: 1px solid #d7e3dc; }
+        .guide-box { background: #f4f8f6; border-left: 3px solid var(--moh-green); }
     </style>
 </head>
 <body class="moh-body" data-nav-tool="rhspars">
@@ -41,7 +43,7 @@
             <div id="navigationItems"></div>
         </aside>
         <main class="moh-main">
-            <div class="moh-hero mb-3">
+            <div class="moh-hero mb-3 score-sticky">
                 <div class="small"><strong id="facilityLabel">Facility</strong> · <span id="visitMeta"></span></div>
                 <div class="progress mt-2" style="height:6px"><div class="progress-bar" id="progressBar" style="width:0%"></div></div>
                 <p class="small text-muted mb-0 mt-2">Yes earns weight · No = 0 · N/A excluded. Domain score = achieved ÷ possible for answered items.</p>

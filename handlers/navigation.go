@@ -38,8 +38,9 @@ func GetNavigationItems(c *fiber.Ctx) error {
 	tool := strings.ToLower(strings.TrimSpace(c.Query("tool")))
 	items := []NavigationItem{}
 
-	// Always offer a way back to the tile picker when inside a tool
-	if tool == "proficiency" || tool == "rhspars" {
+	canProficiency := hasPermission("tools.proficiency.access") || hasPermission("assessments.view") || hasPermission("assessments.create")
+	canRHSPars := hasPermission("tools.rh_spars.access") || hasPermission("rhspars.view") || hasPermission("rhspars.create")
+	if (tool == "proficiency" || tool == "rhspars") && canProficiency && canRHSPars {
 		items = append(items, NavigationItem{
 			Label: "All tools",
 			URL:   "tools.html",
@@ -89,6 +90,13 @@ func GetNavigationItems(c *fiber.Ctx) error {
 			URL:   "rhspars-home.html",
 			Icon:  "bi-hospital",
 		})
+		if hasPermission("rhspars.view") || hasPermission("dashboard.view") {
+			items = append(items, NavigationItem{
+				Label: "Dashboard",
+				URL:   "rhspars-dashboard.html",
+				Icon:  "bi-speedometer2",
+			})
+		}
 		if hasPermission("rhspars.view") {
 			items = append(items, NavigationItem{
 				Label: "History",

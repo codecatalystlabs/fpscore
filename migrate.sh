@@ -48,6 +48,7 @@ FILES=(
   seed-rhspars-questions.sql
   seed-tool-roles.sql
   migration-rhspars-scoring.sql
+  migration-rhspars-domain-followup.sql
   seed-users.sql
 )
 
