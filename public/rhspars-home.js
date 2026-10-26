@@ -82,6 +82,56 @@ function fillSelect(el, items, placeholder, selectedValue) {
     if (selectedValue) el.value = String(selectedValue);
 }
 
+function inferFacilityType(name) {
+    const n = (name || '').toLowerCase();
+    if (!n || n === 'select facility') return '';
+    if (n.includes('national referral')) return 'National Referral Hospital';
+    if (n.includes('regional')) return 'Regional Referral Hospital';
+    if (n.includes('hospital')) return 'Hospital';
+    if (/\bhc\s*iv\b|health centre iv|health center iv/.test(n)) return 'HC IV';
+    if (/\bhc\s*iii\b|health centre iii|health center iii/.test(n)) return 'HC III';
+    if (/\bhc\s*ii\b|health centre ii|health center ii/.test(n)) return 'HC II';
+    if (n.includes('health centre') || n.includes('health center')) return 'Health Centre';
+    if (n.includes('clinic')) return 'Clinic';
+    return '';
+}
+
+function applyFacilityType() {
+    const facilityEl = document.getElementById('facilitySelect');
+    const typeEl = document.getElementById('facilityTypeDetail');
+    const name = facilityEl.value ? (facilityEl.selectedOptions[0]?.text || '') : '';
+    typeEl.value = inferFacilityType(name);
+    typeEl.readOnly = !!typeEl.value;
+}
+
+function lettersOnly(value) {
+    return String(value || '').replace(/[0-9]/g, '');
+}
+
+function digitsOnly(value) {
+    return String(value || '').replace(/\D/g, '');
+}
+
+function isTextOnly(value) {
+    const v = String(value || '').trim();
+    return /[A-Za-z]/.test(v) && !/[0-9]/.test(v);
+}
+
+function isEmail(value) {
+    return /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(String(value || '').trim());
+}
+
+function syncDateLimits() {
+    const today = todayISO();
+    const completion = document.getElementById('assessmentCompletionDate');
+    const next = document.getElementById('nextSupervisionDate');
+    completion.min = today;
+    if (completion.value && completion.value < today) completion.value = today;
+    const base = completion.value || today;
+    next.min = plusDaysISO(base, 1);
+    if (next.value && next.value < next.min) next.value = '';
+}
+
 function todayISO() {
     const d = new Date();
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
@@ -190,7 +240,9 @@ function syncVisitFieldsToDraft() {
         districtId: document.getElementById('districtSelect').value || '',
         subcountyId: document.getElementById('subcountySelect').value || '',
         facilityId: facilityEl.value ? parseInt(facilityEl.value, 10) : null,
-        facilityName: facilityEl.selectedOptions[0]?.text || '',
+        facilityName: facilityEl.value ? (facilityEl.selectedOptions[0]?.text || '') : '',
+        regionName: document.getElementById('regionSelect').value ? (document.getElementById('regionSelect').selectedOptions[0]?.text || '') : '',
+        districtName: document.getElementById('districtSelect').value ? (document.getElementById('districtSelect').selectedOptions[0]?.text || '') : '',
         supervisionType: document.getElementById('supervisionType').value,
         supervisionDate: document.getElementById('supervisionDate').value,
         nextSupervisionDate: document.getElementById('nextSupervisionDate').value,
@@ -295,14 +347,15 @@ async function initGeo() {
     const supervisionDate = document.getElementById('supervisionDate');
     supervisionDate.value = today;
     supervisionDate.readOnly = true;
-    document.getElementById('nextSupervisionDate').min = plusDaysISO(today, 1);
     if (!draft.assessmentCompletionDate) document.getElementById('assessmentCompletionDate').value = today;
+    syncDateLimits();
 
-    ['supervisionType','nextSupervisionDate','assessmentCompletionDate','rhSupplier','facilityTypeDetail','facilityOwnership','primaryContactName','primaryContactPhone','primaryContactEmail','completedByName','completedByDesignation','completedByInstitution']
+    ['supervisionType','nextSupervisionDate','assessmentCompletionDate','rhSupplier','facilityOwnership','primaryContactName','primaryContactPhone','primaryContactEmail','completedByName','completedByDesignation','completedByInstitution']
         .forEach(id => {
             const el = document.getElementById(id);
             if (el && draft[id]) el.value = draft[id];
         });
+    syncDateLimits();
 
     regionSelect.addEventListener('change', async function() {
         districtSelect.innerHTML = '<option value="">Select district</option>';
@@ -347,9 +400,22 @@ async function initGeo() {
         fillSelect(facilitySelect, facilities, 'Select facility');
     });
 
-    facilitySelect.addEventListener('change', syncVisitFieldsToDraft);
-    ['supervisionType','supervisionDate','nextSupervisionDate','rhSupplier','facilityTypeDetail','facilityOwnership','primaryContactName','primaryContactPhone']
+    facilitySelect.addEventListener('change', () => {
+        applyFacilityType();
+        syncVisitFieldsToDraft();
+    });
+    document.getElementById('assessmentCompletionDate').addEventListener('change', () => {
+        syncDateLimits();
+        syncVisitFieldsToDraft();
+    });
+    ['supervisionType','supervisionDate','nextSupervisionDate','rhSupplier','facilityOwnership','primaryContactName','primaryContactPhone','primaryContactEmail','completedByName','completedByDesignation','completedByInstitution']
         .forEach(id => document.getElementById(id).addEventListener('change', syncVisitFieldsToDraft));
+    ['primaryContactName','completedByName','completedByDesignation','completedByInstitution'].forEach(id => {
+        const el = document.getElementById(id);
+        el.addEventListener('input', () => { el.value = lettersOnly(el.value); });
+    });
+    const phone = document.getElementById('primaryContactPhone');
+    phone.addEventListener('input', () => { phone.value = digitsOnly(phone.value); });
 
     // Restore cascade from draft
     if (draft.regionId) {
@@ -361,6 +427,7 @@ async function initGeo() {
             if (draft.subcountyId) {
                 const facilities = await api('/api/facilities/' + draft.subcountyId);
                 fillSelect(facilitySelect, facilities, 'Select facility', draft.facilityId);
+                applyFacilityType();
             }
         }
     }
@@ -394,8 +461,26 @@ document.getElementById('submitVisitBtn').addEventListener('click', async functi
         ['completedByDesignation', 'Designation'],
         ['completedByInstitution', 'Institution / organisation']
     ].forEach(([key, label]) => { if (!draft[key]) missing.push(label); });
-    if (draft.nextSupervisionDate && draft.supervisionDate && draft.nextSupervisionDate <= draft.supervisionDate) {
-        missing.push('Next supervision date must be after the supervision date');
+    const today = todayISO();
+    if (draft.assessmentCompletionDate && draft.assessmentCompletionDate < today) {
+        missing.push('Assessment completion date cannot be before today');
+    }
+    if (draft.nextSupervisionDate && draft.assessmentCompletionDate && draft.nextSupervisionDate <= draft.assessmentCompletionDate) {
+        missing.push('Next supervision date must be after the assessment completion date');
+    }
+    [
+        ['primaryContactName', 'Primary contact person at site'],
+        ['completedByName', 'Completed by name'],
+        ['completedByDesignation', 'Designation'],
+        ['completedByInstitution', 'Institution / organisation']
+    ].forEach(([key, label]) => {
+        if (draft[key] && !isTextOnly(draft[key])) missing.push(label + ' must be text only');
+    });
+    if (draft.primaryContactPhone && !/^\d{7,15}$/.test(draft.primaryContactPhone)) {
+        missing.push('Telephone must be numbers only');
+    }
+    if (draft.primaryContactEmail && !isEmail(draft.primaryContactEmail)) {
+        missing.push('Email must include letters and a valid address');
     }
     if (missing.length) {
         alert('Complete the visit details before submitting:\n• ' + missing.join('\n• '));

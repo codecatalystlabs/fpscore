@@ -63,6 +63,37 @@ func nullDate(s string) interface{} {
 	return s
 }
 
+func dateOnly(s string) string {
+	s = strings.TrimSpace(s)
+	if len(s) >= 10 && s[4] == '-' && s[7] == '-' {
+		return s[:10]
+	}
+	return s
+}
+
+func jsonFloat(v sql.NullFloat64) interface{} {
+	if !v.Valid {
+		return nil
+	}
+	return v.Float64
+}
+
+func meanPresent(vals ...sql.NullFloat64) float64 {
+	sum := 0.0
+	n := 0
+	for _, v := range vals {
+		if !v.Valid {
+			continue
+		}
+		sum += v.Float64
+		n++
+	}
+	if n == 0 {
+		return 0
+	}
+	return sum / float64(n)
+}
+
 func GetRHSParsDomains(c *fiber.Ctx) error {
 	rows, err := database.DB.Query(`
 		SELECT id, code, name, display_order
@@ -394,7 +425,20 @@ func CreateRHSParsAssessment(c *fiber.Ctx) error {
 	com := domainPct["commodities"]
 	hi := domainPct["health_information"]
 	gf := domainPct["general_facility"]
-	grand := (mat + fp + anc + com + hi + gf) / 6.0
+	assessed := []float64{}
+	for _, code := range []string{"maternity", "fp", "anc", "commodities", "health_information", "general_facility"} {
+		if pct, ok := domainPct[code]; ok {
+			assessed = append(assessed, pct)
+		}
+	}
+	grand := 0.0
+	if len(assessed) > 0 {
+		sum := 0.0
+		for _, pct := range assessed {
+			sum += pct
+		}
+		grand = sum / float64(len(assessed))
+	}
 	performanceLevel := PerformanceLevelFromPercentage(grand)
 
 	_, err = tx.Exec(`
@@ -448,8 +492,12 @@ func GetRHSParsAssessments(c *fiber.Ctx) error {
 
 	query := `
 		SELECT a.id, a.supervision_type, a.supervision_date, a.grand_percentage,
-		       a.maternity_pct, a.fp_pct, a.anc_pct, a.commodities_pct,
-		       a.health_info_pct, a.general_facility_pct,
+		       (SELECT ds.percentage_score FROM rhspars_domain_scores ds JOIN rhspars_domains dom ON dom.id = ds.domain_id WHERE ds.assessment_id = a.id AND dom.code = 'maternity'),
+		       (SELECT ds.percentage_score FROM rhspars_domain_scores ds JOIN rhspars_domains dom ON dom.id = ds.domain_id WHERE ds.assessment_id = a.id AND dom.code = 'fp'),
+		       (SELECT ds.percentage_score FROM rhspars_domain_scores ds JOIN rhspars_domains dom ON dom.id = ds.domain_id WHERE ds.assessment_id = a.id AND dom.code = 'anc'),
+		       (SELECT ds.percentage_score FROM rhspars_domain_scores ds JOIN rhspars_domains dom ON dom.id = ds.domain_id WHERE ds.assessment_id = a.id AND dom.code = 'commodities'),
+		       (SELECT ds.percentage_score FROM rhspars_domain_scores ds JOIN rhspars_domains dom ON dom.id = ds.domain_id WHERE ds.assessment_id = a.id AND dom.code = 'health_information'),
+		       (SELECT ds.percentage_score FROM rhspars_domain_scores ds JOIN rhspars_domains dom ON dom.id = ds.domain_id WHERE ds.assessment_id = a.id AND dom.code = 'general_facility'),
 		       a.total_possible_score, a.achieved_score, a.performance_level,
 		       f.id, f.name as facility_name,
 		       s.name as subcounty_name, d.id, d.name as district_name,
@@ -536,26 +584,34 @@ func GetRHSParsAssessments(c *fiber.Ctx) error {
 	for rows.Next() {
 		var id, facilityID, districtID, regionID int
 		var supervisionType, supervisionDate, createdAt sql.NullString
-		var grand, mat, fp, anc, com, hi, gf float64
+		var storedGrand float64
+		var mat, fp, anc, com, hi, gf sql.NullFloat64
 		var totalPossible, achieved int
 		var performanceLevel, facilityName, subcountyName, districtName, regionName string
-		if err := rows.Scan(&id, &supervisionType, &supervisionDate, &grand, &mat, &fp, &anc, &com, &hi, &gf,
+		if err := rows.Scan(&id, &supervisionType, &supervisionDate, &storedGrand, &mat, &fp, &anc, &com, &hi, &gf,
 			&totalPossible, &achieved, &performanceLevel,
 			&facilityID, &facilityName, &subcountyName, &districtID, &districtName,
 			&regionID, &regionName, &createdAt); err != nil {
 			return err
 		}
+		grand := meanPresent(mat, fp, anc, com, hi, gf)
+		if grand == 0 && storedGrand > 0 && !mat.Valid && !fp.Valid && !anc.Valid && !com.Valid && !hi.Valid && !gf.Valid {
+			grand = storedGrand
+		}
+		if mat.Valid || fp.Valid || anc.Valid || com.Valid || hi.Valid || gf.Valid {
+			performanceLevel = PerformanceLevelFromPercentage(grand)
+		}
 		out = append(out, map[string]interface{}{
 			"id": id,
 			"supervisionType": supervisionType.String,
-			"supervisionDate": supervisionDate.String,
+			"supervisionDate": dateOnly(supervisionDate.String),
 			"grandPercentage": grand,
-			"maternityPct": mat,
-			"fpPct": fp,
-			"ancPct": anc,
-			"commoditiesPct": com,
-			"healthInfoPct": hi,
-			"generalFacilityPct": gf,
+			"maternityPct": jsonFloat(mat),
+			"fpPct": jsonFloat(fp),
+			"ancPct": jsonFloat(anc),
+			"commoditiesPct": jsonFloat(com),
+			"healthInfoPct": jsonFloat(hi),
+			"generalFacilityPct": jsonFloat(gf),
 			"totalPossible": totalPossible,
 			"achieved": achieved,
 			"performanceLevel": performanceLevel,
@@ -566,7 +622,7 @@ func GetRHSParsAssessments(c *fiber.Ctx) error {
 			"districtName": districtName,
 			"regionId": regionID,
 			"regionName": regionName,
-			"createdAt": createdAt.String,
+			"createdAt": dateOnly(createdAt.String),
 		})
 	}
 	return c.JSON(out)
@@ -781,8 +837,8 @@ func GetRHSParsAssessment(c *fiber.Ctx) error {
 			"facilityId": assessment.FacilityID,
 			"facilityName": assessment.FacilityName,
 			"supervisionType": assessment.SupervisionType.String,
-			"supervisionDate": assessment.SupervisionDate.String,
-			"nextSupervisionDate": assessment.NextSupervisionDate.String,
+			"supervisionDate": dateOnly(assessment.SupervisionDate.String),
+			"nextSupervisionDate": dateOnly(assessment.NextSupervisionDate.String),
 			"rhSupplier": assessment.RHSupplier.String,
 			"facilityTypeDetail": assessment.FacilityTypeDetail.String,
 			"facilityOwnership": assessment.FacilityOwnership.String,
@@ -792,7 +848,7 @@ func GetRHSParsAssessment(c *fiber.Ctx) error {
 			"completedByName": assessment.CompletedByName.String,
 			"completedByDesignation": assessment.CompletedByDesignation.String,
 			"completedByInstitution": assessment.CompletedByInstitution.String,
-			"assessmentCompletionDate": assessment.AssessmentCompletionDate.String,
+			"assessmentCompletionDate": dateOnly(assessment.AssessmentCompletionDate.String),
 			"notes": assessment.Notes.String,
 			"maternityPct": assessment.MaternityPct,
 			"fpPct": assessment.FPPct,

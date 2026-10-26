@@ -249,11 +249,11 @@ function escAttr(value) {
 function personFields(person) {
     const p = person || {};
     return `<div class="person-row border rounded p-2 mb-2">
-        <input class="form-control form-control-sm mb-1 p-name" placeholder="Name" value="${escAttr(p.fullName)}">
-        <input class="form-control form-control-sm mb-1 p-cadre" placeholder="Cadre / position" value="${escAttr(p.cadrePosition)}">
-        <input class="form-control form-control-sm mb-1 p-aff" placeholder="Affiliation" value="${escAttr(p.affiliation)}">
+        <input class="form-control form-control-sm mb-1 p-name text-only" placeholder="Name (letters only)" value="${escAttr(p.fullName)}">
+        <input class="form-control form-control-sm mb-1 p-cadre text-only" placeholder="Cadre / position (letters only)" value="${escAttr(p.cadrePosition)}">
+        <input class="form-control form-control-sm mb-1 p-aff text-only" placeholder="Affiliation (letters only)" value="${escAttr(p.affiliation)}">
         <div class="d-flex gap-1">
-            <input class="form-control form-control-sm p-contact" placeholder="Contact" value="${escAttr(p.contact)}">
+            <input class="form-control form-control-sm p-contact digits-only" inputmode="numeric" placeholder="Contact (numbers only)" value="${escAttr(p.contact)}">
             <button type="button" class="btn btn-sm btn-outline-danger remove-row">×</button>
         </div>
     </div>`;
@@ -263,11 +263,11 @@ function actionFields(item) {
     const a = item || {};
     return `<div class="action-row border rounded p-2 mb-2">
         <div class="row g-1">
-            <div class="col-md-4"><input class="form-control form-control-sm ap-gap" placeholder="Gap identified" value="${escAttr(a.gapIdentified)}"></div>
-            <div class="col-md-4"><input class="form-control form-control-sm ap-action" placeholder="Action / recommendation" value="${escAttr(a.actionRecommendation)}"></div>
-            <div class="col-md-4"><input class="form-control form-control-sm ap-mov" placeholder="Means of verification" value="${escAttr(a.meansOfVerification)}"></div>
-            <div class="col-md-4"><input class="form-control form-control-sm ap-person" placeholder="Responsible person" value="${escAttr(a.responsiblePerson)}"></div>
-            <div class="col-md-4"><input class="form-control form-control-sm ap-time" placeholder="Time frame" value="${escAttr(a.timeFrame)}"></div>
+            <div class="col-md-4"><input class="form-control form-control-sm ap-gap words-required" placeholder="Gap identified (words, not numbers only)" value="${escAttr(a.gapIdentified)}"></div>
+            <div class="col-md-4"><input class="form-control form-control-sm ap-action words-required" placeholder="Action / recommendation" value="${escAttr(a.actionRecommendation)}"></div>
+            <div class="col-md-4"><input class="form-control form-control-sm ap-mov words-required" placeholder="Means of verification" value="${escAttr(a.meansOfVerification)}"></div>
+            <div class="col-md-4"><input class="form-control form-control-sm ap-person words-required" placeholder="Responsible person (letters)" value="${escAttr(a.responsiblePerson)}"></div>
+            <div class="col-md-4"><input class="form-control form-control-sm ap-time words-required" placeholder="Time frame (for example, 2 weeks)" value="${escAttr(a.timeFrame)}"></div>
             <div class="col-md-4 text-end"><button type="button" class="btn btn-sm btn-outline-danger remove-row">Remove</button></div>
         </div>
     </div>`;
@@ -326,6 +326,28 @@ function bindDomainFollowUp() {
         if (list.children.length > 1) row.remove();
         else row.querySelectorAll('input').forEach(input => { input.value = ''; });
     });
+    document.getElementById('domainFollowUp').addEventListener('input', (event) => {
+        const input = event.target;
+        if (input.classList.contains('text-only')) input.value = input.value.replace(/[0-9]/g, '');
+        if (input.classList.contains('digits-only')) input.value = input.value.replace(/\D/g, '');
+    });
+}
+
+function followUpProblems(follow) {
+    const problems = [];
+    const people = (follow.present || []).concat(follow.supervisors || []);
+    people.forEach(person => {
+        ['fullName', 'cadrePosition', 'affiliation'].forEach(key => {
+            if (person[key] && /[0-9]/.test(person[key])) problems.push('Name, cadre, and affiliation must be text only');
+        });
+        if (person.contact && /\D/.test(person.contact)) problems.push('Contact must be numbers only');
+    });
+    (follow.actionPlan || []).forEach(item => {
+        ['gapIdentified', 'actionRecommendation', 'meansOfVerification', 'responsiblePerson', 'timeFrame'].forEach(key => {
+            if (item[key] && !/[A-Za-z]/.test(item[key])) problems.push('Action plan entries must include words, not numbers alone');
+        });
+    });
+    return [...new Set(problems)];
 }
 
 function readPeople(listId) {
@@ -367,8 +389,14 @@ function saveAndReturn() {
     const domainId = new URLSearchParams(location.search).get('domainId');
     const noteEl = document.getElementById('observationNote');
     if (noteEl) observationNotes[domainId] = noteEl.value;
+    const followUp = readDomainFollowUp();
+    const problems = followUpProblems(followUp);
+    if (problems.length) {
+        alert(problems.join('\n'));
+        return;
+    }
     const domainExtras = { ...(draft.domainExtras || {}) };
-    domainExtras[domainId] = readDomainFollowUp();
+    domainExtras[domainId] = followUp;
 
     sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ ...draft, responses: merged, observationNotes, domainExtras }));
     window.location.href = 'rhspars-home.html';

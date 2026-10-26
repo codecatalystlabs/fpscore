@@ -1,9 +1,9 @@
 sessionStorage.setItem('active_tool', 'rhspars');
 
 const DOMAINS = [
-    { key: 'ancPct', label: 'Antenatal care' },
-    { key: 'maternityPct', label: 'Maternity' },
-    { key: 'fpPct', label: 'Family planning' },
+    { key: 'maternityPct', label: 'Maternity services' },
+    { key: 'fpPct', label: 'Family planning services' },
+    { key: 'ancPct', label: 'Antenatal care services' },
     { key: 'commoditiesPct', label: 'Drugs and supplies' },
     { key: 'healthInfoPct', label: 'Health information' },
     { key: 'generalFacilityPct', label: 'General facility' }
@@ -21,8 +21,9 @@ let allVisits = [];
 const charts = {};
 
 function visitDate(row) {
-    const raw = row.supervisionDate || row.createdAt || '';
-    const d = new Date(raw);
+    const raw = String(row.supervisionDate || row.createdAt || '').slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return null;
+    const d = new Date(raw + 'T00:00:00');
     return Number.isNaN(d.getTime()) ? null : d;
 }
 
@@ -55,6 +56,79 @@ function esc(value) {
     }[ch]));
 }
 
+function scored(row, key) {
+    const value = row[key];
+    if (value === null || value === undefined || value === '') return null;
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+}
+
+function rowGrand(row) {
+    const values = DOMAINS.map(d => scored(row, d.key)).filter(v => v !== null);
+    if (!values.length) return null;
+    return mean(values);
+}
+
+function openHref(row) {
+    return row.inProgress ? 'rhspars-home.html' : 'rhspars-view.html?id=' + row.id;
+}
+
+const CODE_KEY = {
+    maternity: 'maternityPct',
+    fp: 'fpPct',
+    anc: 'ancPct',
+    commodities: 'commoditiesPct',
+    health_information: 'healthInfoPct',
+    general_facility: 'generalFacilityPct'
+};
+
+function scoreDraft(structure) {
+    let draft = {};
+    try {
+        draft = JSON.parse(sessionStorage.getItem('rhspars_draft') || '{}');
+    } catch (e) {
+        return null;
+    }
+    const responses = draft.responses || {};
+    if (!Object.keys(responses).length) return null;
+
+    const domainSections = {};
+    (structure || []).forEach(domain => {
+        const key = CODE_KEY[domain.code];
+        if (!key) return;
+        const sections = [];
+        (domain.thematicAreas || []).forEach(area => {
+            let possible = 0;
+            let achieved = 0;
+            (area.questions || []).forEach(q => {
+                const response = responses[String(q.id)] || responses[q.id];
+                const result = scoreResponse(response, Number(q.scoreWeight) || 0);
+                if (!result.counts) return;
+                possible += Number(q.scoreWeight) || 0;
+                achieved += result.points;
+            });
+            if (possible > 0) sections.push(percentageScore(achieved, possible));
+        });
+        if (sections.length) domainSections[key] = mean(sections);
+    });
+    if (!Object.keys(domainSections).length) return null;
+
+    const row = {
+        id: 'draft',
+        inProgress: true,
+        facilityId: draft.facilityId || 'draft',
+        facilityName: draft.facilityName || 'Visit in progress',
+        districtName: draft.districtName || '',
+        regionName: draft.regionName || '',
+        supervisionType: draft.supervisionType || '',
+        supervisionDate: draft.supervisionDate || ''
+    };
+    DOMAINS.forEach(d => { row[d.key] = Object.prototype.hasOwnProperty.call(domainSections, d.key) ? domainSections[d.key] : null; });
+    row.grandPercentage = rowGrand(row);
+    row.performanceLevel = levelOf(row.grandPercentage);
+    return row;
+}
+
 function filteredVisits() {
     const period = document.getElementById('filterPeriod').value;
     const region = document.getElementById('filterRegion').value;
@@ -65,7 +139,7 @@ function filteredVisits() {
         if (district && String(row.districtName) !== district) return false;
         if (cutoff) {
             const d = visitDate(row);
-            if (!d || d.getTime() < cutoff) return false;
+            if (d && d.getTime() < cutoff) return false;
         }
         return true;
     });
@@ -115,26 +189,48 @@ function render(rows) {
         return;
     }
 
-    const grand = rows.map(r => Number(r.grandPercentage) || 0);
-    const avg = mean(grand);
+    const grands = rows.map(rowGrand).filter(v => v !== null);
+    const avg = mean(grands);
     const facilities = latestByFacility(rows);
     const counts = { Proficient: 0, Competent: 0, 'Not Acceptable': 0 };
     rows.forEach(r => {
-        const level = r.performanceLevel || levelOf(r.grandPercentage);
+        const pct = rowGrand(r);
+        if (pct === null) return;
+        const level = levelOf(pct);
         counts[level] = (counts[level] || 0) + 1;
     });
-    const domainAvgs = DOMAINS.map(d => ({
-        ...d,
-        value: mean(rows.map(r => Number(r[d.key]) || 0))
-    }));
+    const domainAvgs = DOMAINS.map(d => {
+        const values = rows.map(r => scored(r, d.key)).filter(v => v !== null);
+        return { ...d, value: values.length ? mean(values) : null };
+    }).filter(d => d.value !== null);
     const weakest = [...domainAvgs].sort((a, b) => a.value - b.value)[0];
     const strongest = [...domainAvgs].sort((a, b) => b.value - a.value)[0];
-    const below = facilities.filter(r => Number(r.grandPercentage) < 70).length;
+    const below = facilities.filter(r => {
+        const pct = rowGrand(r);
+        return pct !== null && pct < 70;
+    }).length;
     const selfCount = rows.filter(r => r.supervisionType === 'self').length;
     const externalCount = rows.filter(r => r.supervisionType === 'external').length;
     const ranked = facilities.slice().sort((a, b) => Number(a.grandPercentage) - Number(b.grandPercentage));
 
+    const pivotRows = domainAvgs.map((d, i) => `<tr>
+        <td>${i + 1}</td>
+        <td>${esc(d.label)}</td>
+        <td><strong>${d.value.toFixed(1)}%</strong></td>
+    </tr>`).join('');
+
     root.innerHTML = `
+        <div class="moh-card mb-3">
+            <h5>Average percentage score</h5>
+            <p class="text-muted mb-2">Average of the domains that have been scored. Domains not yet entered are left out.</p>
+            <table class="table table-sm mb-0">
+                <thead><tr><th>SNo</th><th>Indicator / building block</th><th>Average percentage score</th></tr></thead>
+                <tbody>
+                    ${pivotRows}
+                    <tr><td></td><td><strong>Grand facility percentage score</strong></td><td><strong>${avg.toFixed(1)}%</strong></td></tr>
+                </tbody>
+            </table>
+        </div>
         <div class="kpi-grid">
             <div class="kpi"><div class="label">Visits</div><div class="value">${rows.length}</div><div class="hint">${externalCount} external · ${selfCount} self</div></div>
             <div class="kpi"><div class="label">Mean grand score</div><div class="value">${avg.toFixed(1)}%</div><div class="hint">${esc(levelOf(avg))}</div></div>
@@ -144,7 +240,7 @@ function render(rows) {
         </div>
         <div class="insight">
             <i class="bi bi-lightbulb"></i>
-            <div>Strongest block is <strong>${strongest.label}</strong> at ${strongest.value.toFixed(1)}%. The weakest is <strong>${weakest.label}</strong> at ${weakest.value.toFixed(1)}%.</div>
+            <div>${domainAvgs.length ? `Showing ${domainAvgs.length} scored domain${domainAvgs.length === 1 ? '' : 's'}. Strongest is <strong>${esc(strongest.label)}</strong> at ${strongest.value.toFixed(1)}%. Weakest is <strong>${esc(weakest.label)}</strong> at ${weakest.value.toFixed(1)}%.` : 'No domain scores in this view yet.'}</div>
         </div>
         <div class="chart-grid mb-3">
             <div class="moh-card"><h5>Performance mix</h5><canvas id="mixChart"></canvas></div>
@@ -158,19 +254,23 @@ function render(rows) {
                 <table class="table table-sm mb-0">
                     <thead><tr>
                         <th>Facility</th><th>District</th>
-                        ${DOMAINS.map(d => `<th>${esc(d.label)}</th>`).join('')}
+                        ${domainAvgs.map(d => `<th>${esc(d.label)}</th>`).join('')}
                         <th>Grand</th>
                     </tr></thead>
                     <tbody>
-                        ${ranked.map(r => `<tr>
-                            <td><a href="rhspars-view.html?id=${r.id}">${esc(r.facilityName)}</a></td>
+                        ${ranked.map(r => {
+                            const grandPct = rowGrand(r);
+                            return `<tr>
+                            <td><a href="${openHref(r)}">${esc(r.facilityName)}</a>${r.inProgress ? ' <span class="text-muted">in progress</span>' : ''}</td>
                             <td>${esc(r.districtName)}</td>
-                            ${DOMAINS.map(d => {
-                                const pct = Number(r[d.key]) || 0;
+                            ${domainAvgs.map(d => {
+                                const pct = scored(r, d.key);
+                                if (pct === null) return '<td class="text-muted">—</td>';
                                 return `<td><span class="heat" style="${heatStyle(pct)}">${pct.toFixed(0)}</span></td>`;
                             }).join('')}
-                            <td><span class="heat" style="${heatStyle(r.grandPercentage)}">${Number(r.grandPercentage).toFixed(1)}</span></td>
-                        </tr>`).join('')}
+                            <td>${grandPct === null ? '<span class="text-muted">—</span>' : `<span class="heat" style="${heatStyle(grandPct)}">${grandPct.toFixed(1)}</span>`}</td>
+                        </tr>`;
+                        }).join('')}
                     </tbody>
                 </table>
             </div>
@@ -183,13 +283,13 @@ function render(rows) {
                         <thead><tr><th>Facility</th><th>District</th><th>Latest</th><th></th></tr></thead>
                         <tbody>
                             ${ranked.map(r => {
-                                const pct = Number(r.grandPercentage);
-                                const level = r.performanceLevel || levelOf(pct);
+                                const pct = rowGrand(r);
+                                const level = pct === null ? '' : levelOf(pct);
                                 return `<tr>
                                     <td>${esc(r.facilityName)}</td>
                                     <td>${esc(r.districtName)}</td>
-                                    <td><strong style="color:${barColor(pct)}">${pct.toFixed(1)}%</strong></td>
-                                    <td><a href="rhspars-view.html?id=${r.id}">${esc(level)}</a></td>
+                                    <td>${pct === null ? '—' : `<strong style="color:${barColor(pct)}">${pct.toFixed(1)}%</strong>`}</td>
+                                    <td><a href="${openHref(r)}">${r.inProgress ? 'Continue' : esc(level)}</a></td>
                                 </tr>`;
                             }).join('')}
                         </tbody>
@@ -203,13 +303,13 @@ function render(rows) {
                         <thead><tr><th>Date</th><th>Facility</th><th>Score</th><th></th></tr></thead>
                         <tbody>
                             ${rows.slice(0, 12).map(r => {
-                                const pct = Number(r.grandPercentage);
+                                const pct = rowGrand(r);
                                 const when = (r.supervisionDate || r.createdAt || '').toString().slice(0, 10);
                                 return `<tr>
                                     <td>${when}</td>
-                                    <td>${esc(r.facilityName)}<div class="text-muted">${esc(r.regionName)}</div></td>
-                                    <td><strong style="color:${barColor(pct)}">${pct.toFixed(1)}%</strong></td>
-                                    <td><a href="rhspars-view.html?id=${r.id}">Open</a></td>
+                                    <td>${esc(r.facilityName)}${r.inProgress ? ' <span class="text-muted">in progress</span>' : ''}<div class="text-muted">${esc(r.regionName)}</div></td>
+                                    <td>${pct === null ? '—' : `<strong style="color:${barColor(pct)}">${pct.toFixed(1)}%</strong>`}</td>
+                                    <td><a href="${openHref(r)}">${r.inProgress ? 'Continue' : 'Open'}</a></td>
                                 </tr>`;
                             }).join('')}
                         </tbody>
@@ -218,6 +318,7 @@ function render(rows) {
             </div>
         </div>`;
 
+    try {
     charts.mix = new Chart(document.getElementById('mixChart'), {
         type: 'doughnut',
         data: {
@@ -254,7 +355,9 @@ function render(rows) {
         if (!d) return;
         const key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
         if (!months.has(key)) months.set(key, []);
-        months.get(key).push(Number(r.grandPercentage) || 0);
+        const pct = rowGrand(r);
+        if (pct === null) return;
+        months.get(key).push(pct);
     });
     const monthKeys = [...months.keys()].sort();
     charts.trend = new Chart(document.getElementById('trendChart'), {
@@ -276,17 +379,26 @@ function render(rows) {
             scales: { y: { min: 0, max: 100, ticks: { callback: v => v + '%' } } }
         }
     });
+    } catch (err) {
+        console.error(err);
+    }
 }
 
 async function load() {
-    const res = await fetch('/api/rhspars/assessments', { headers: authHeaders() });
-    if (res.status === 401) { logout(); return; }
+    const [res, structureRes] = await Promise.all([
+        fetch('/api/rhspars/assessments', { headers: authHeaders() }),
+        fetch('/api/rhspars/structure', { headers: authHeaders() })
+    ]);
+    if (res.status === 401 || structureRes.status === 401) { logout(); return; }
     if (!res.ok) {
         document.getElementById('dashboard').innerHTML = '<div class="alert alert-danger">Could not load visits.</div>';
         return;
     }
     const data = await res.json();
+    const structure = structureRes.ok ? await structureRes.json() : [];
     allVisits = Array.isArray(data) ? data : [];
+    const draftRow = scoreDraft(Array.isArray(structure) ? structure : []);
+    if (draftRow) allVisits = [draftRow, ...allVisits];
     fillFilters();
     render(filteredVisits());
 }
